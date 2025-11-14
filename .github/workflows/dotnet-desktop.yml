@@ -2,6 +2,10 @@
 
 name: .NET Desktop
 
+permissions:
+  actions: write
+  contents: read
+
 on:
   push:
     branches: [ "main", "master", "claude/**" ]
@@ -63,27 +67,32 @@ jobs:
       if: matrix.configuration == 'Release'
       run: Compress-Archive -Path ./publish/* -DestinationPath ./publish/YouTubeDownloader-publish.zip -Force
 
-    # Upload build artifacts (Release only)
-    - name: Upload Release Artifacts
+    # Verify publish output (Release only)
+    - name: Verify publish output
       if: matrix.configuration == 'Release'
+      run: dir ./publish || ls -la ./publish
+
+    # Upload build artifacts (Release only, not on forked PRs)
+    - name: Upload Release Artifacts
+      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/upload-artifact@v4
       with:
         name: YouTubeDownloader-win-x64
         path: ./publish/YouTubeDownloader.exe
         if-no-files-found: error
 
-    # Upload all published files as artifact
+    # Upload all published files as artifact (Release only, not on forked PRs)
     - name: Upload Full Release Package
-      if: matrix.configuration == 'Release'
+      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/upload-artifact@v4
       with:
         name: YouTubeDownloader-full-package
         path: ./publish/
         if-no-files-found: error
 
-    # Create a GitHub Release and upload the exe and zip as release assets (Release only)
+    # Create a GitHub Release and upload the exe and zip as release assets (Release only, not on forked PRs)
     - name: Create Release
-      if: matrix.configuration == 'Release'
+      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       id: create_release
       uses: actions/create-release@v1
       env:
@@ -96,7 +105,7 @@ jobs:
         prerelease: false
 
     - name: Upload Release EXE Asset
-      if: matrix.configuration == 'Release'
+      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
@@ -105,7 +114,7 @@ jobs:
         asset_content_type: application/octet-stream
 
     - name: Upload Release ZIP Asset
-      if: matrix.configuration == 'Release'
+      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/upload-release-asset@v1
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
