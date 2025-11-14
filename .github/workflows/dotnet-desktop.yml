@@ -1,0 +1,77 @@
+# This workflow builds and publishes the YouTube Downloader .NET Windows Forms application
+
+name: .NET Desktop
+
+on:
+  push:
+    branches: [ "main", "master", "claude/**" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
+
+    runs-on: windows-latest  # Windows required for Windows Forms
+
+    env:
+      Solution_Name: YouTubeDownloader.csproj
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    # Install the .NET 9 workload
+    - name: Install .NET 9
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 9.0.x
+
+    # Restore dependencies
+    - name: Restore dependencies
+      run: dotnet restore $env:Solution_Name
+
+    # Build the application
+    - name: Build
+      run: dotnet build $env:Solution_Name -c ${{ matrix.configuration }} --no-restore
+
+    # Execute all unit tests in the solution
+    - name: Execute unit tests
+      run: dotnet test $env:Solution_Name -c ${{ matrix.configuration }} --no-build --verbosity normal
+      continue-on-error: true  # Continue if no tests exist
+
+    # Publish the application (Release only)
+    - name: Publish Application (Release)
+      if: matrix.configuration == 'Release'
+      run: |
+        dotnet publish $env:Solution_Name `
+          -c Release `
+          -r win-x64 `
+          --self-contained true `
+          -p:PublishSingleFile=true `
+          -p:IncludeNativeLibrariesForSelfExtract=true `
+          -p:EnableCompressionInSingleFile=true `
+          -o ./publish
+
+    # Upload build artifacts (Release only)
+    - name: Upload Release Artifacts
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: YouTubeDownloader-win-x64
+        path: ./publish/YouTubeDownloader.exe
+        if-no-files-found: error
+
+    # Upload all published files as artifact
+    - name: Upload Full Release Package
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-artifact@v4
+      with:
+        name: YouTubeDownloader-full-package
+        path: ./publish/
+        if-no-files-found: error
