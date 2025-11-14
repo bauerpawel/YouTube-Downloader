@@ -58,6 +58,11 @@ jobs:
           -p:EnableCompressionInSingleFile=true `
           -o ./publish
 
+    # Package publish folder (Release only) - create zip of the publish folder
+    - name: Package publish folder
+      if: matrix.configuration == 'Release'
+      run: Compress-Archive -Path ./publish/* -DestinationPath ./publish/YouTubeDownloader-publish.zip -Force
+
     # Upload build artifacts (Release only)
     - name: Upload Release Artifacts
       if: matrix.configuration == 'Release'
@@ -75,3 +80,35 @@ jobs:
         name: YouTubeDownloader-full-package
         path: ./publish/
         if-no-files-found: error
+
+    # Create a GitHub Release and upload the exe and zip as release assets (Release only)
+    - name: Create Release
+      if: matrix.configuration == 'Release'
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}-${{ github.sha }}
+        release_name: Automated Release ${{ github.run_number }}
+        body: Automated release for run ${{ github.run_id }} (commit ${{ github.sha }})
+        draft: false
+        prerelease: false
+
+    - name: Upload Release EXE Asset
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./publish/YouTubeDownloader.exe
+        asset_name: YouTubeDownloader.exe
+        asset_content_type: application/octet-stream
+
+    - name: Upload Release ZIP Asset
+      if: matrix.configuration == 'Release'
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./publish/YouTubeDownloader-publish.zip
+        asset_name: YouTubeDownloader-publish.zip
+        asset_content_type: application/zip
