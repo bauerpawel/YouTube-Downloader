@@ -4,7 +4,7 @@ name: .NET Desktop
 
 permissions:
   actions: write
-  contents: read
+  contents: write
 
 on:
   push:
@@ -107,6 +107,8 @@ jobs:
     - name: Upload Release EXE Asset
       if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./publish/YouTubeDownloader.exe
@@ -116,6 +118,8 @@ jobs:
     - name: Upload Release ZIP Asset
       if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ steps.create_release.outputs.upload_url }}
         asset_path: ./publish/YouTubeDownloader-publish.zip
