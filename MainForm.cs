@@ -580,7 +580,7 @@ namespace YouTubeDownloader
                 Regex percentRegex = new Regex(@"([0-9]+(?:\.[0-9]+)?)%");
                 Match percentMatch = percentRegex.Match(line);
                 double percent = 0.0;
-                if (percentMatch.Success && double.TryParse(percentMatch.Groups[1].Value, out double parsedPercent))
+                if (percentMatch.Success && double.TryParse(percentMatch.Groups[1].Value, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double parsedPercent))
                 {
                     percent = parsedPercent;
                     if (progressBar != null)
