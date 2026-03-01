@@ -47,6 +47,11 @@ namespace YouTubeDownloader
             this.Size = new System.Drawing.Size(800, 500);
             this.StartPosition = FormStartPosition.CenterScreen;
 
+            var iconStream = System.Reflection.Assembly.GetExecutingAssembly()
+                .GetManifestResourceStream("YouTubeDownloader.app.ico");
+            if (iconStream != null)
+                this.Icon = new System.Drawing.Icon(iconStream);
+
             menuStrip = new MenuStrip();
             ToolStripMenuItem narzedziaMenu = new ToolStripMenuItem("&Narzedzia");
             ToolStripMenuItem aktualizujKomponentyItem = new ToolStripMenuItem("&Aktualizuj komponenty", null, AktualizujKomponenty_Click);
