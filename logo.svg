@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 160" width="520" height="160">
+  <!-- Background -->
+  <rect width="520" height="160" rx="14" fill="#ffffff"/>
+
+  <!-- YouTube-style rounded rect (icon) -->
+  <rect x="16" y="18" width="138" height="96" rx="20" fill="#FF0000"/>
+
+  <!-- White circle for icon -->
+  <circle cx="85" cy="66" r="32" fill="white"/>
+
+  <!-- Download arrow (red) -->
+  <!-- vertical line -->
+  <rect x="79" y="43" width="12" height="21" rx="3" fill="#FF0000"/>
+  <!-- arrowhead -->
+  <polygon points="66,60 104,60 85,81" fill="#FF0000"/>
+  <!-- underline -->
+  <rect x="63" y="85" width="44" height="8" rx="3" fill="#FF0000"/>
+
+  <!-- App title -->
+  <text x="174" y="68"
+        font-family="'Segoe UI', system-ui, Arial, sans-serif"
+        font-size="44" font-weight="800" fill="#1a1a1a">YouTube</text>
+  <text x="174" y="112"
+        font-family="'Segoe UI', system-ui, Arial, sans-serif"
+        font-size="34" font-weight="300" fill="#FF0000" letter-spacing="1">Downloader</text>
+
+  <!-- .NET 10 badge -->
+  <rect x="174" y="126" width="108" height="24" rx="7" fill="#512BD4"/>
+  <text x="228" y="143"
+        font-family="'Segoe UI', system-ui, Arial, sans-serif"
+        font-size="13" font-weight="600" fill="white" text-anchor="middle">.NET 10.0</text>
+</svg>

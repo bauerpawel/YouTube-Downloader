@@ -2,7 +2,9 @@
 
 <div align="center">
 
-![.NET](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet)
+<img src="logo.svg" alt="YouTube Downloader Logo" width="480"/>
+
+![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)
 ![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
@@ -21,7 +23,7 @@
 
 ### 📝 Opis
 
-YouTube Downloader to aplikacja desktopowa dla systemu Windows, zbudowana w .NET 9 i Windows Forms, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
+YouTube Downloader to aplikacja desktopowa dla systemu Windows, zbudowana w .NET 10 i Windows Forms, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
 
 ### ✨ Funkcje
 
@@ -42,23 +44,23 @@ YouTube Downloader to aplikacja desktopowa dla systemu Windows, zbudowana w .NET
 - **Połączenie internetowe**: Wymagane do pobierania filmów i zależności
 
 #### Do kompilacji:
-- **.NET 9 SDK** lub nowszy
+- **.NET 10 SDK** lub nowszy
 - **Visual Studio 2022** (opcjonalnie) lub dowolny edytor obsługujący C#
 - **System operacyjny**: Windows, Linux lub macOS (do kompilacji)
 
-### 📥 Instalacja .NET 9 SDK
+### 📥 Instalacja .NET 10 SDK
 
 #### Windows:
 ```powershell
 # Pobierz i zainstaluj z oficjalnej strony
-# https://dotnet.microsoft.com/download/dotnet/9.0
+# https://dotnet.microsoft.com/download/dotnet/10.0
 ```
 
 #### Linux (Ubuntu/Debian):
 ```bash
 wget https://dot.net/v1/dotnet-install.sh
 chmod +x dotnet-install.sh
-./dotnet-install.sh --channel 9.0
+./dotnet-install.sh --channel 10.0
 ```
 
 #### Weryfikacja instalacji:
@@ -110,7 +112,7 @@ dotnet publish -c Release -r win-x64 --self-contained false
 
 Plik wykonywalny zostanie utworzony w:
 ```
-bin/Release/net9.0-windows/win-x64/publish/
+bin/Release/net10.0-windows/win-x64/publish/
 ```
 
 ### 🚀 Użytkowanie
@@ -128,7 +130,8 @@ bin/Release/net9.0-windows/win-x64/publish/
 ```
 YouTube-Downloader/
 ├── MainForm.cs                 # Główna aplikacja - Windows Form z całą logiką
-├── YouTubeDownloader.csproj    # Konfiguracja projektu .NET 9
+├── YouTubeDownloader.csproj    # Konfiguracja projektu .NET 10
+├── logo.svg                    # Logo aplikacji
 ├── README.md                   # Dokumentacja projektu
 ├── CLAUDE.md                   # Przewodnik dla asystentów AI
 ├── LICENSE                     # Licencja Apache 2.0
@@ -157,7 +160,7 @@ Zgłoszenia błędów i pull requesty są mile widziane na GitHub.
 
 ### 📝 Description
 
-YouTube Downloader is a Windows desktop application built with .NET 9 and Windows Forms that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
+YouTube Downloader is a Windows desktop application built with .NET 10 and Windows Forms that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
 
 ### ✨ Features
 
@@ -178,23 +181,23 @@ YouTube Downloader is a Windows desktop application built with .NET 9 and Window
 - **Internet connection**: Required for downloading videos and dependencies
 
 #### To compile:
-- **.NET 9 SDK** or newer
+- **.NET 10 SDK** or newer
 - **Visual Studio 2022** (optional) or any C#-compatible editor
 - **Operating System**: Windows, Linux, or macOS (for compilation)
 
-### 📥 Installing .NET 9 SDK
+### 📥 Installing .NET 10 SDK
 
 #### Windows:
 ```powershell
 # Download and install from official website
-# https://dotnet.microsoft.com/download/dotnet/9.0
+# https://dotnet.microsoft.com/download/dotnet/10.0
 ```
 
 #### Linux (Ubuntu/Debian):
 ```bash
 wget https://dot.net/v1/dotnet-install.sh
 chmod +x dotnet-install.sh
-./dotnet-install.sh --channel 9.0
+./dotnet-install.sh --channel 10.0
 ```
 
 #### Verify installation:
@@ -246,7 +249,7 @@ dotnet publish -c Release -r win-x64 --self-contained false
 
 The executable will be created in:
 ```
-bin/Release/net9.0-windows/win-x64/publish/
+bin/Release/net10.0-windows/win-x64/publish/
 ```
 
 ### 🚀 Usage
@@ -264,7 +267,8 @@ bin/Release/net9.0-windows/win-x64/publish/
 ```
 YouTube-Downloader/
 ├── MainForm.cs                 # Main application - Windows Form with all logic
-├── YouTubeDownloader.csproj    # .NET 9 project configuration
+├── YouTubeDownloader.csproj    # .NET 10 project configuration
+├── logo.svg                    # Application logo
 ├── README.md                   # Project documentation
 ├── CLAUDE.md                   # AI assistant guide
 ├── LICENSE                     # Apache 2.0 license
