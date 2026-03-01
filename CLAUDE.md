@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-**YouTube Downloader** is a Windows desktop application built with .NET 9 and Windows Forms that enables users to download videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish-language interface for selecting download quality and format.
+**YouTube Downloader** is a Windows desktop application built with .NET 10 and Windows Forms that enables users to download videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish-language interface for selecting download quality and format.
 
 ### Key Information
-- **Technology Stack**: .NET 9, C# 13, Windows Forms
-- **Target Platform**: Windows (net9.0-windows)
+- **Technology Stack**: .NET 10, C# 13, Windows Forms
+- **Target Platform**: Windows (net10.0-windows)
 - **License**: Apache License 2.0
 - **Primary Language**: C# with Polish UI text
 - **Architecture**: Single-file Windows Forms application with external dependency management
@@ -16,7 +16,8 @@
 ```
 YouTube-Downloader/
 ├── MainForm.cs                 # Main application - Windows Form with all logic
-├── YouTubeDownloader.csproj    # .NET 9 project configuration
+├── YouTubeDownloader.csproj    # .NET 10 project configuration
+├── logo.svg                    # Application logo
 ├── README.md                   # Project documentation
 ├── LICENSE                     # Apache 2.0 license
 └── CLAUDE.md                   # This file - AI assistant guide
@@ -362,14 +363,14 @@ Before committing changes, verify:
   - Alternative: Node.js (if available in PATH)
 
 ### NuGet Dependencies
-None - project uses only .NET 9 BCL (Base Class Library)
+None - project uses only .NET 10 BCL (Base Class Library)
 
 ## Useful References
 
 - [yt-dlp Documentation](https://github.com/yt-dlp/yt-dlp#readme)
 - [FFmpeg Documentation](https://ffmpeg.org/documentation.html)
 - [Windows Forms Documentation](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/)
-- [.NET 9 Documentation](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-9)
+- [.NET 10 Documentation](https://learn.microsoft.com/en-us/dotnet/core/whats-new/dotnet-10)
 - [C# Async/Await Patterns](https://learn.microsoft.com/en-us/dotnet/csharp/asynchronous-programming/)
 
 ## Git Workflow
@@ -380,11 +381,6 @@ This project follows standard Git practices:
 - **Push**: Always push to your feature branch with retry logic
 - **Pull Requests**: Target the main branch when ready
 
-### Current Branch
-As of this documentation, development is on:
-```
-claude/create-codebase-documentation-01DjxCrHzAFWa6dothenfX9q
-```
 
 ## Future Improvements to Consider
 
@@ -401,6 +397,6 @@ claude/create-codebase-documentation-01DjxCrHzAFWa6dothenfX9q
 
 ---
 
-**Last Updated**: 2025-11-14
+**Last Updated**: 2026-03-01
 **For**: AI Assistants (Claude, etc.)
-**Project**: YouTube Downloader for Windows (.NET 9)
+**Project**: YouTube Downloader for Windows (.NET 10)
