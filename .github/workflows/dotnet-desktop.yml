@@ -26,13 +26,13 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
 
     # Install the .NET 10 workload
     - name: Install .NET 10
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
 
@@ -75,7 +75,7 @@ jobs:
     # Upload build artifacts (Release only, not on forked PRs)
     - name: Upload Release Artifacts
       if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: YouTubeDownloader-win-x64
         path: ./publish/YouTubeDownloader.exe
@@ -84,44 +84,26 @@ jobs:
     # Upload all published files as artifact (Release only, not on forked PRs)
     - name: Upload Full Release Package
       if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: YouTubeDownloader-full-package
         path: ./publish/
         if-no-files-found: error
 
     # Create a GitHub Release and upload the exe and zip as release assets (Release only, not on forked PRs)
+    # Note: actions/create-release and actions/upload-release-asset are archived/unmaintained,
+    # replaced with softprops/action-gh-release which covers both in one step.
     - name: Create Release
       if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      id: create_release
-      uses: actions/create-release@v1
+      uses: softprops/action-gh-release@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         tag_name: v${{ github.run_number }}-${{ github.sha }}
-        release_name: Automated Release ${{ github.run_number }}
+        name: Automated Release ${{ github.run_number }}
         body: Automated release for run ${{ github.run_id }} (commit ${{ github.sha }})
         draft: false
         prerelease: false
-
-    - name: Upload Release EXE Asset
-      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./publish/YouTubeDownloader.exe
-        asset_name: YouTubeDownloader.exe
-        asset_content_type: application/octet-stream
-
-    - name: Upload Release ZIP Asset
-      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: ./publish/YouTubeDownloader-publish.zip
-        asset_name: YouTubeDownloader-publish.zip
-        asset_content_type: application/zip
+        files: |
+          ./publish/YouTubeDownloader.exe
+          ./publish/YouTubeDownloader-publish.zip

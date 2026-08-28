@@ -1,0 +1,18 @@
+# Build output
+bin/
+obj/
+publish/
+
+# Runtime-downloaded dependencies (see CLAUDE.md)
+yt-dlp.exe
+deno.exe
+node.exe
+ffmpeg_bin/
+ffmpeg_version.txt
+downloads/
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.user
+*.suo
