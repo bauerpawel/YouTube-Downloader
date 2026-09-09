@@ -66,7 +66,7 @@ The application is split across a small number of Avalonia UI files, rather than
 ### Key Components
 
 #### 1. UI Components (`MainWindow.axaml`)
-Named elements (`x:Name`) become strongly-typed, non-nullable code-behind fields automatically - see Key Conventions:
+Named elements (`Name`) become strongly-typed, non-nullable code-behind fields automatically - see Key Conventions:
 - `TxtUrl`: TextBox for the first/primary YouTube URL
 - `BtnAddUrl` / `ExtraUrlRowsPanel`: adds dynamic extra URL rows for multi-URL downloads
 - `CbContentType`: ComboBox for Video+Audio or Audio-only selection
@@ -229,7 +229,7 @@ This environment has no GUI test automation - there is no headless/CI-runnable U
 
 ### Avalonia UI Conventions
 - **Framework**: Avalonia UI 12.1.2 (XAML + code-behind, no MVVM) - controls are declared in a `.axaml` file, and all logic lives in the paired `.axaml.cs` code-behind class
-- `x:Name="TxtUrl"` in XAML generates a strongly-typed, **non-nullable** `TxtUrl` field on the code-behind class automatically - there is no manual field declaration step, unlike the old WinForms `private TextBox? txtUrl;` pattern
+- `Name="TxtUrl"` in XAML generates a strongly-typed, **non-nullable** `TxtUrl` field on the code-behind class automatically - there is no manual field declaration step, unlike the old WinForms `private TextBox? txtUrl;` pattern
 - Event handlers are wired up explicitly in the constructor, after `InitializeComponent()`, e.g. `BtnDownload.Click += async (s, e) => await BtnDownload_Click();` - **not** via XAML `Click="..."` attributes. This keeps XAML parsing and code-behind compilation order independent and is the pattern used throughout this codebase
 - Property renames from WinForms: `IsEnabled` replaces `Enabled`; `ComboBox.SelectionChanged` replaces `ComboBox.SelectedIndexChanged`
 
@@ -305,7 +305,7 @@ The application parses yt-dlp output using regex patterns:
    - Update `BuildYtDlpArguments()` to handle the new option
 
 2. **New UI Elements**:
-   - Add the element to the appropriate `.axaml` file with an `x:Name` - Avalonia's XAML compiler generates the code-behind field automatically, no manual field declaration needed
+   - Add the element to the appropriate `.axaml` file with a `Name` - Avalonia's XAML compiler generates the code-behind field automatically, no manual field declaration needed
    - Wire any event handlers in the constructor after `InitializeComponent()`
 
 3. **New Dependency**:
@@ -372,7 +372,7 @@ using (var process = Process.Start(processInfo))
 6. **Test dependency availability** before executing external tools
 
 ### When Fixing Bugs
-1. **Remember XAML-named elements are non-nullable** - Avalonia generates strongly-typed fields for every `x:Name`, so defensive null checks on them are unnecessary (unlike the old WinForms `txtUrl?` pattern); still apply normal nullable-reference-type discipline to everything else
+1. **Remember XAML-named elements are non-nullable** - Avalonia generates strongly-typed fields for every `Name`, so defensive null checks on them are unnecessary (unlike the old WinForms `txtUrl?` pattern); still apply normal nullable-reference-type discipline to everything else
 2. **Verify paths** - ensure `Path.Combine()` usage
 3. **Test process execution** - check redirected output handling
 4. **Validate regex patterns** - test with actual yt-dlp output
