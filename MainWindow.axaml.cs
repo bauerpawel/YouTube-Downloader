@@ -61,6 +61,7 @@ public partial class MainWindow : Window
         BtnAddUrl.Click += BtnAddUrl_Click;
         BtnDownload.Click += async (s, e) => await BtnDownload_Click();
         MiAktualizujKomponenty.Click += async (s, e) => await AktualizujKomponenty_Click();
+        MiInformacje.Click += async (s, e) => await Informacje_Click();
 
         CheckAndDownloadComponents();
     }
@@ -830,5 +831,11 @@ public partial class MainWindow : Window
             await MessageDialog.ShowAsync(this, "Blad (" + rawUrl + "): " + ex.Message, "Blad");
             return false;
         }
+    }
+
+    private async Task Informacje_Click()
+    {
+        var about = new AboutWindow();
+        await about.ShowDialog(this);
     }
 }
