@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <AvaloniaResource Include="app.ico" />
+    <AvaloniaResource Include="Assets\app-logo.png" />
   </ItemGroup>
 
 </Project>
