@@ -140,9 +140,17 @@ dotnet build -c Release
 # Run the application
 dotnet run
 
-# Publish single-file executable
+# Publish single-file executable (x64)
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+
+# Publish single-file executable (ARM64, e.g. Windows on ARM)
+dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true
+
+# Or use build.bat, which wraps the above (defaults to win-x64):
+build.bat win-arm64
 ```
+
+CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes both `win-x64` and `win-arm64` on every push to `main`, attaching both to the automated GitHub Release. Windows Forms only runs on Windows, so macOS/Linux builds are not supported by this project.
 
 ### Testing Changes
 

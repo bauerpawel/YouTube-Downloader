@@ -13,6 +13,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+env:
+  Solution_Name: YouTubeDownloader.csproj
+
 jobs:
   build:
     strategy:
@@ -20,9 +23,6 @@ jobs:
         configuration: [Debug, Release]
 
     runs-on: windows-latest  # Windows required for Windows Forms
-
-    env:
-      Solution_Name: YouTubeDownloader.csproj
 
     steps:
     - name: Checkout
@@ -49,52 +49,78 @@ jobs:
       run: dotnet test $env:Solution_Name -c ${{ matrix.configuration }} --no-build --verbosity normal
       continue-on-error: true  # Continue if no tests exist
 
-    # Publish the application (Release only)
-    - name: Publish Application (Release)
-      if: matrix.configuration == 'Release'
+  publish:
+    needs: build
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # not on forked PRs
+
+    strategy:
+      max-parallel: 1  # avoid racing when both RIDs update the same GitHub Release
+      matrix:
+        rid: [win-x64, win-arm64]
+
+    runs-on: windows-latest  # Windows required for Windows Forms
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+
+    # Install the .NET 10 workload
+    - name: Install .NET 10
+      uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+
+    # Restore dependencies
+    - name: Restore dependencies
+      run: dotnet restore $env:Solution_Name
+
+    # Publish the self-contained single-file application for this architecture
+    - name: Publish Application (${{ matrix.rid }})
       run: |
         dotnet publish $env:Solution_Name `
           -c Release `
-          -r win-x64 `
+          -r ${{ matrix.rid }} `
           --self-contained true `
           -p:PublishSingleFile=true `
           -p:IncludeNativeLibrariesForSelfExtract=true `
           -p:EnableCompressionInSingleFile=true `
-          -o ./publish
+          -o ./publish/${{ matrix.rid }}
 
-    # Package publish folder (Release only) - create zip of the publish folder
+    # Package publish folder - create zip of the publish folder
     - name: Package publish folder
-      if: matrix.configuration == 'Release'
-      run: Compress-Archive -Path ./publish/* -DestinationPath ./publish/YouTubeDownloader-publish.zip -Force
+      run: Compress-Archive -Path ./publish/${{ matrix.rid }}/* -DestinationPath ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip -Force
 
-    # Verify publish output (Release only)
+    # Verify publish output
     - name: Verify publish output
-      if: matrix.configuration == 'Release'
-      run: dir ./publish || ls -la ./publish
+      run: dir ./publish/${{ matrix.rid }} || ls -la ./publish/${{ matrix.rid }}
 
-    # Upload build artifacts (Release only, not on forked PRs)
+    # Upload build artifacts
     - name: Upload Release Artifacts
-      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/upload-artifact@v7
       with:
-        name: YouTubeDownloader-win-x64
-        path: ./publish/YouTubeDownloader.exe
+        name: YouTubeDownloader-${{ matrix.rid }}
+        path: ./publish/${{ matrix.rid }}/YouTubeDownloader.exe
         if-no-files-found: error
 
-    # Upload all published files as artifact (Release only, not on forked PRs)
+    # Upload all published files as artifact
     - name: Upload Full Release Package
-      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: actions/upload-artifact@v7
       with:
-        name: YouTubeDownloader-full-package
-        path: ./publish/
+        name: YouTubeDownloader-${{ matrix.rid }}-full-package
+        path: ./publish/${{ matrix.rid }}/
         if-no-files-found: error
 
-    # Create a GitHub Release and upload the exe and zip as release assets (Release only, not on forked PRs)
+    # GitHub release assets must have unique file names across the whole release,
+    # so give the per-RID exe a distinct name before attaching it.
+    - name: Prepare release asset names
+      run: Copy-Item ./publish/${{ matrix.rid }}/YouTubeDownloader.exe ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.exe
+
+    # Create/update a GitHub Release and upload the exe and zip as release assets
     # Note: actions/create-release and actions/upload-release-asset are archived/unmaintained,
     # replaced with softprops/action-gh-release which covers both in one step.
     - name: Create Release
-      if: matrix.configuration == 'Release' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       uses: softprops/action-gh-release@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -105,5 +131,5 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          ./publish/YouTubeDownloader.exe
-          ./publish/YouTubeDownloader-publish.zip
+          ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.exe
+          ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip

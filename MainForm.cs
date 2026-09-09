@@ -14,18 +14,25 @@ namespace YouTubeDownloader
     public partial class MainForm : Form
     {
         private TextBox? txtUrl;
+        private Button? btnAddUrl;
         private Button? btnDownload;
         private ProgressBar? progressBar;
         private Label? lblStatus;
+        private Label? lblContentType;
+        private Label? lblQuality;
+        private Label? lblFormat;
         private MenuStrip? menuStrip;
         private ComboBox? cbQuality;
         private ComboBox? cbFormat;
         private ComboBox? cbContentType;
+        private readonly List<TextBox> extraUrlBoxes = new List<TextBox>();
+        private readonly List<Button> removeUrlButtons = new List<Button>();
         private readonly HttpClient httpClient;
         private readonly string appDirectory;
         private readonly string ytDlpPath;
         private readonly string ffmpegBinPath;
         private readonly string denoPath;
+        private readonly string denoVersionPath;
         private readonly string nodeJsPath;
 
         public MainForm()
@@ -35,6 +42,7 @@ namespace YouTubeDownloader
             ytDlpPath = Path.Combine(appDirectory, "yt-dlp.exe");
             ffmpegBinPath = Path.Combine(appDirectory, "ffmpeg_bin");
             denoPath = Path.Combine(appDirectory, "deno.exe");
+            denoVersionPath = Path.Combine(appDirectory, "deno_version.txt");
             nodeJsPath = Path.Combine(appDirectory, "node.exe");
 
             InitializeComponent();
@@ -58,6 +66,11 @@ namespace YouTubeDownloader
             narzedziaMenu.DropDownItems.Add(aktualizujKomponentyItem);
             menuStrip.Items.Add(narzedziaMenu);
 
+            ToolStripMenuItem pomocMenu = new ToolStripMenuItem("&Pomoc");
+            ToolStripMenuItem informacjeItem = new ToolStripMenuItem("&Informacje", null, Informacje_Click);
+            pomocMenu.DropDownItems.Add(informacjeItem);
+            menuStrip.Items.Add(pomocMenu);
+
             Label lblUrl = new Label();
             lblUrl.Text = "Link do filmu:";
             lblUrl.Location = new System.Drawing.Point(20, 40);
@@ -65,10 +78,16 @@ namespace YouTubeDownloader
 
             txtUrl = new TextBox();
             txtUrl.Location = new System.Drawing.Point(20, 65);
-            txtUrl.Size = new System.Drawing.Size(750, 25);
+            txtUrl.Size = new System.Drawing.Size(700, 25);
             txtUrl.Text = "https://www.youtube.com/watch?v=";
 
-            Label lblContentType = new Label();
+            btnAddUrl = new Button();
+            btnAddUrl.Text = "+";
+            btnAddUrl.Location = new System.Drawing.Point(730, 65);
+            btnAddUrl.Size = new System.Drawing.Size(40, 25);
+            btnAddUrl.Click += BtnAddUrl_Click;
+
+            lblContentType = new Label();
             lblContentType.Text = "Typ:";
             lblContentType.Location = new System.Drawing.Point(20, 100);
             lblContentType.AutoSize = true;
@@ -81,7 +100,7 @@ namespace YouTubeDownloader
             cbContentType.SelectedIndex = 0;
             cbContentType.SelectedIndexChanged += ContentType_Changed;
 
-            Label lblQuality = new Label();
+            lblQuality = new Label();
             lblQuality.Text = "Jakosc:";
             lblQuality.Location = new System.Drawing.Point(200, 100);
             lblQuality.AutoSize = true;
@@ -93,7 +112,7 @@ namespace YouTubeDownloader
             cbQuality.Items.AddRange(new object[] { "Najlepsza", "4K (2160p)", "1080p", "720p", "480p", "360p", "240p" });
             cbQuality.SelectedIndex = 0;
 
-            Label lblFormat = new Label();
+            lblFormat = new Label();
             lblFormat.Text = "Format:";
             lblFormat.Location = new System.Drawing.Point(380, 100);
             lblFormat.AutoSize = true;
@@ -129,6 +148,7 @@ namespace YouTubeDownloader
             this.Controls.Add(menuStrip);
             this.Controls.Add(lblUrl);
             this.Controls.Add(txtUrl);
+            this.Controls.Add(btnAddUrl);
             this.Controls.Add(lblContentType);
             this.Controls.Add(cbContentType);
             this.Controls.Add(lblQuality);
@@ -152,6 +172,83 @@ namespace YouTubeDownloader
                 if (cbQuality != null) cbQuality.Enabled = true;
                 if (cbFormat != null) cbFormat.Enabled = true;
             }
+        }
+
+        private void BtnAddUrl_Click(object? sender, EventArgs e)
+        {
+            TextBox newUrlBox = new TextBox();
+            newUrlBox.Size = new System.Drawing.Size(700, 25);
+            newUrlBox.PlaceholderText = "Wklej kolejny link do filmu...";
+
+            Button removeBtn = new Button();
+            removeBtn.Text = "-";
+            removeBtn.Size = new System.Drawing.Size(40, 25);
+            removeBtn.Click += (s, args) => RemoveUrlRow(newUrlBox, removeBtn);
+
+            extraUrlBoxes.Add(newUrlBox);
+            removeUrlButtons.Add(removeBtn);
+
+            this.Controls.Add(newUrlBox);
+            this.Controls.Add(removeBtn);
+
+            RelayoutForm();
+        }
+
+        private void RemoveUrlRow(TextBox box, Button button)
+        {
+            extraUrlBoxes.Remove(box);
+            removeUrlButtons.Remove(button);
+            this.Controls.Remove(box);
+            this.Controls.Remove(button);
+            box.Dispose();
+            button.Dispose();
+
+            RelayoutForm();
+        }
+
+        private void RelayoutForm()
+        {
+            const int rowHeight = 30;
+            int y = 95;
+            for (int i = 0; i < extraUrlBoxes.Count; i++)
+            {
+                extraUrlBoxes[i].Location = new System.Drawing.Point(20, y);
+                removeUrlButtons[i].Location = new System.Drawing.Point(730, y);
+                y += rowHeight;
+            }
+
+            int offset = extraUrlBoxes.Count * rowHeight;
+
+            if (lblContentType != null) lblContentType.Location = new System.Drawing.Point(20, 100 + offset);
+            if (cbContentType != null) cbContentType.Location = new System.Drawing.Point(20, 125 + offset);
+            if (lblQuality != null) lblQuality.Location = new System.Drawing.Point(200, 100 + offset);
+            if (cbQuality != null) cbQuality.Location = new System.Drawing.Point(200, 125 + offset);
+            if (lblFormat != null) lblFormat.Location = new System.Drawing.Point(380, 100 + offset);
+            if (cbFormat != null) cbFormat.Location = new System.Drawing.Point(380, 125 + offset);
+            if (btnDownload != null) btnDownload.Location = new System.Drawing.Point(560, 125 + offset);
+            if (progressBar != null) progressBar.Location = new System.Drawing.Point(20, 170 + offset);
+            if (lblStatus != null) lblStatus.Location = new System.Drawing.Point(20, 210 + offset);
+
+            this.Size = new System.Drawing.Size(this.Size.Width, 500 + offset);
+        }
+
+        private void SetUrlRowsEnabled(bool enabled)
+        {
+            if (txtUrl != null) txtUrl.Enabled = enabled;
+            if (btnAddUrl != null) btnAddUrl.Enabled = enabled;
+            foreach (var box in extraUrlBoxes) box.Enabled = enabled;
+            foreach (var btn in removeUrlButtons) btn.Enabled = enabled;
+        }
+
+        private List<string> GetAllUrls()
+        {
+            List<string> urls = new List<string>();
+            if (txtUrl != null)
+                urls.Add(txtUrl.Text.Trim());
+            foreach (var box in extraUrlBoxes)
+                urls.Add(box.Text.Trim());
+
+            return urls.Where(u => !string.IsNullOrWhiteSpace(u)).ToList();
         }
 
         private async void CheckAndDownloadComponents()
@@ -203,19 +300,19 @@ namespace YouTubeDownloader
             return false;
         }
 
-        private async Task DownloadDeno()
+        private async Task<(string downloadUrl, string version)> GetLatestDenoInfo()
         {
             try
             {
-                UpdateStatus("Pobieranie Deno runtime...");
-                
                 httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("YouTubeDownloader/1.0");
                 string apiUrl = "https://api.github.com/repos/denoland/deno/releases/latest";
-                
+
                 var response = await httpClient.GetStringAsync(apiUrl);
                 var jsonDoc = JsonDocument.Parse(response);
                 var root = jsonDoc.RootElement;
-                
+
+                string version = root.GetProperty("tag_name").GetString() ?? "";
+
                 string downloadUrl = "";
                 var assets = root.GetProperty("assets");
                 foreach (var asset in assets.EnumerateArray())
@@ -227,6 +324,23 @@ namespace YouTubeDownloader
                         break;
                     }
                 }
+
+                return (downloadUrl, version);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Blad pobierania informacji Deno: " + ex.Message, "Blad", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return ("", "");
+            }
+        }
+
+        private async Task DownloadDeno()
+        {
+            try
+            {
+                UpdateStatus("Pobieranie Deno runtime...");
+
+                var (downloadUrl, version) = await GetLatestDenoInfo();
 
                 if (string.IsNullOrEmpty(downloadUrl))
                 {
@@ -247,6 +361,10 @@ namespace YouTubeDownloader
                 }
 
                 File.Delete(zipPath);
+
+                if (!string.IsNullOrEmpty(version))
+                    await File.WriteAllTextAsync(denoVersionPath, version);
+
                 UpdateStatus("Deno zainstalowane");
             }
             catch (Exception ex)
@@ -462,6 +580,92 @@ namespace YouTubeDownloader
             return true;
         }
 
+        private void Informacje_Click(object? sender, EventArgs e)
+        {
+            using (Form aboutForm = new Form())
+            {
+                aboutForm.Text = "Informacje o programie";
+                aboutForm.ClientSize = new System.Drawing.Size(400, 310);
+                aboutForm.StartPosition = FormStartPosition.CenterParent;
+                aboutForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                aboutForm.MaximizeBox = false;
+                aboutForm.MinimizeBox = false;
+                aboutForm.Icon = this.Icon;
+
+                PictureBox pictureBox = new PictureBox();
+                pictureBox.Size = new System.Drawing.Size(64, 64);
+                pictureBox.Location = new System.Drawing.Point(168, 20);
+                pictureBox.SizeMode = PictureBoxSizeMode.Zoom;
+                pictureBox.Image = this.Icon?.ToBitmap();
+
+                Label lblName = new Label();
+                lblName.Text = "YouTube Downloader";
+                lblName.Font = new System.Drawing.Font("Segoe UI", 14, System.Drawing.FontStyle.Bold);
+                lblName.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+                lblName.Location = new System.Drawing.Point(0, 95);
+                lblName.Size = new System.Drawing.Size(400, 30);
+
+                Label lblVersion = new Label();
+                lblVersion.Text = "Wersja 1.0.0";
+                lblVersion.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+                lblVersion.Location = new System.Drawing.Point(0, 130);
+                lblVersion.Size = new System.Drawing.Size(400, 20);
+
+                Label lblLicense = new Label();
+                lblLicense.Text = "Licencja: Apache License 2.0";
+                lblLicense.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+                lblLicense.Location = new System.Drawing.Point(0, 155);
+                lblLicense.Size = new System.Drawing.Size(400, 20);
+
+                LinkLabel lnkRepo = new LinkLabel();
+                lnkRepo.Text = "Repozytorium: github.com/bauerpawel/YouTube-Downloader";
+                lnkRepo.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+                lnkRepo.Location = new System.Drawing.Point(0, 190);
+                lnkRepo.Size = new System.Drawing.Size(400, 20);
+                string repoUrlText = "github.com/bauerpawel/YouTube-Downloader";
+                lnkRepo.LinkArea = new LinkArea(lnkRepo.Text.IndexOf(repoUrlText, StringComparison.Ordinal), repoUrlText.Length);
+                lnkRepo.LinkClicked += (s, args) => OpenUrl("https://github.com/bauerpawel/YouTube-Downloader");
+
+                LinkLabel lnkAuthor = new LinkLabel();
+                lnkAuthor.Text = "Autor: bauer.net.pl";
+                lnkAuthor.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+                lnkAuthor.Location = new System.Drawing.Point(0, 215);
+                lnkAuthor.Size = new System.Drawing.Size(400, 20);
+                string authorUrlText = "bauer.net.pl";
+                lnkAuthor.LinkArea = new LinkArea(lnkAuthor.Text.IndexOf(authorUrlText, StringComparison.Ordinal), authorUrlText.Length);
+                lnkAuthor.LinkClicked += (s, args) => OpenUrl("https://bauer.net.pl");
+
+                Button btnClose = new Button();
+                btnClose.Text = "Zamknij";
+                btnClose.Size = new System.Drawing.Size(100, 30);
+                btnClose.Location = new System.Drawing.Point(150, 255);
+                btnClose.DialogResult = DialogResult.OK;
+
+                aboutForm.Controls.Add(pictureBox);
+                aboutForm.Controls.Add(lblName);
+                aboutForm.Controls.Add(lblVersion);
+                aboutForm.Controls.Add(lblLicense);
+                aboutForm.Controls.Add(lnkRepo);
+                aboutForm.Controls.Add(lnkAuthor);
+                aboutForm.Controls.Add(btnClose);
+                aboutForm.AcceptButton = btnClose;
+
+                aboutForm.ShowDialog(this);
+            }
+        }
+
+        private void OpenUrl(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Nie mozna otworzyc linku: " + ex.Message, "Blad", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private async void AktualizujKomponenty_Click(object? sender, EventArgs e)
         {
             var result = MessageBox.Show("Zaktualizowac komponenty?", "Aktualizacja", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
@@ -498,10 +702,47 @@ namespace YouTubeDownloader
                     }
                 }
                 
+                await CheckAndUpdateDeno();
                 await CheckAndUpdateFFmpeg();
                 UpdateStatus("Aktualizacja zakonczena");
                 if (btnDownload != null)
                     btnDownload.Enabled = true;
+            }
+        }
+
+        private async Task CheckAndUpdateDeno()
+        {
+            try
+            {
+                if (!File.Exists(denoPath))
+                {
+                    UpdateStatus("Deno: pomijanie (uzywany runtime systemowy)");
+                    return;
+                }
+
+                UpdateStatus("Sprawdzanie wersji Deno...");
+                var (_, latestVersion) = await GetLatestDenoInfo();
+
+                if (string.IsNullOrEmpty(latestVersion))
+                    return;
+
+                string currentVersion = "";
+                if (File.Exists(denoVersionPath))
+                    currentVersion = await File.ReadAllTextAsync(denoVersionPath);
+
+                if (string.IsNullOrEmpty(currentVersion) || currentVersion != latestVersion)
+                {
+                    UpdateStatus("Deno: Nowa wersja dostepna");
+                    await DownloadDeno();
+                }
+                else
+                {
+                    UpdateStatus("Deno: Wersja aktualna");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Blad aktualizacji Deno: " + ex.Message, "Blad", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -575,7 +816,7 @@ namespace YouTubeDownloader
             return "";
         }
 
-        private void ParseDownloadProgress(string line, ProgressBar? progressBar, Label? statusLabel)
+        private void ParseDownloadProgress(string line, ProgressBar? progressBar, Label? statusLabel, string statusPrefix = "")
         {
             try
             {
@@ -613,7 +854,7 @@ namespace YouTubeDownloader
                     status += " ETA: " + eta;
 
                 if (statusLabel != null)
-                    statusLabel.Text = status;
+                    statusLabel.Text = statusPrefix + status;
             }
             catch { }
         }
@@ -668,15 +909,21 @@ namespace YouTubeDownloader
 
         private async void BtnDownload_Click(object? sender, EventArgs e)
         {
-            if (txtUrl == null)
-                return;
+            List<string> rawUrls = GetAllUrls();
 
-            string rawUrl = txtUrl.Text.Trim();
-            
-            if (!ValidateUrl(rawUrl))
+            if (rawUrls.Count == 0)
             {
-                MessageBox.Show("Nieprawidlowy link", "Blad", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Podaj przynajmniej jeden link", "Blad", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
+            }
+
+            foreach (string url in rawUrls)
+            {
+                if (!ValidateUrl(url))
+                {
+                    MessageBox.Show("Nieprawidlowy link: " + url, "Blad", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
             }
 
             if (!File.Exists(ytDlpPath))
@@ -700,10 +947,45 @@ namespace YouTubeDownloader
 
             if (btnDownload != null)
                 btnDownload.Enabled = false;
+            SetUrlRowsEnabled(false);
+
+            int successCount = 0;
+            string downloadsDir = Path.Combine(appDirectory, "downloads");
+
+            for (int i = 0; i < rawUrls.Count; i++)
+            {
+                if (progressBar != null)
+                    progressBar.Value = 0;
+
+                string statusPrefix = rawUrls.Count > 1 ? $"[{i + 1}/{rawUrls.Count}] " : "";
+                UpdateStatus(statusPrefix + "Przygotowanie...");
+
+                bool success = await DownloadSingleUrlAsync(rawUrls[i], runtimePath, statusPrefix);
+                if (success)
+                    successCount++;
+            }
+
+            if (btnDownload != null)
+                btnDownload.Enabled = true;
+            SetUrlRowsEnabled(true);
             if (progressBar != null)
                 progressBar.Value = 0;
-            UpdateStatus("Przygotowanie...");
 
+            if (successCount == rawUrls.Count)
+            {
+                string message = rawUrls.Count > 1 ? "Wszystkie pliki pobrane" : "Plik pobrany";
+                UpdateStatus("Pobieranie zakonczono!");
+                MessageBox.Show(message + ". Lokalizacja: " + downloadsDir, "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            else
+            {
+                UpdateStatus($"Zakonczono: {successCount}/{rawUrls.Count} pobranych");
+                MessageBox.Show($"Pobrano {successCount} z {rawUrls.Count} plikow.", "Zakonczono z bledami", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private async Task<bool> DownloadSingleUrlAsync(string rawUrl, string runtimePath, string statusPrefix)
+        {
             try
             {
                 string normalizedUrl = NormalizeUrl(rawUrl);
@@ -711,7 +993,7 @@ namespace YouTubeDownloader
                 string ytDlpArgs = BuildYtDlpArguments();
                 string downloadsDir = Path.Combine(appDirectory, "downloads");
                 string outputPattern = Path.Combine(downloadsDir, "%(title)s.%(ext)s");
-                
+
                 StringBuilder argBuilder = new StringBuilder();
                 if (!string.IsNullOrEmpty(jsRuntimeArg))
                 {
@@ -726,7 +1008,7 @@ namespace YouTubeDownloader
                 argBuilder.Append("\" \"");
                 argBuilder.Append(normalizedUrl);
                 argBuilder.Append("\"");
-                
+
                 var processInfo = new ProcessStartInfo
                 {
                     FileName = ytDlpPath,
@@ -749,12 +1031,12 @@ namespace YouTubeDownloader
                             {
                                 if (args.Data.Contains("[download]"))
                                 {
-                                    ParseDownloadProgress(args.Data, progressBar, lblStatus);
+                                    ParseDownloadProgress(args.Data, progressBar, lblStatus, statusPrefix);
                                 }
                                 else if (args.Data.Contains("[info]") || args.Data.Contains("Downloading"))
                                 {
                                     if (lblStatus != null)
-                                        lblStatus.Text = args.Data;
+                                        lblStatus.Text = statusPrefix + args.Data;
                                 }
                             }));
                         }
@@ -768,28 +1050,23 @@ namespace YouTubeDownloader
                     {
                         if (progressBar != null)
                             progressBar.Value = 100;
-                        UpdateStatus("Pobieranie zakonczono!");
-                        MessageBox.Show("Plik pobrany. Lokalizacja: " + downloadsDir, "Sukces", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        UpdateStatus(statusPrefix + "Pobrano");
+                        return true;
                     }
                     else
                     {
                         string error = await process.StandardError.ReadToEndAsync();
-                        UpdateStatus("Blad pobierania");
-                        MessageBox.Show("Blad: " + error, "Blad", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        UpdateStatus(statusPrefix + "Blad pobierania");
+                        MessageBox.Show("Blad (" + rawUrl + "): " + error, "Blad", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return false;
                     }
                 }
             }
             catch (Exception ex)
             {
-                UpdateStatus("Blad");
-                MessageBox.Show("Blad: " + ex.Message, "Blad", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                if (btnDownload != null)
-                    btnDownload.Enabled = true;
-                if (progressBar != null)
-                    progressBar.Value = 0;
+                UpdateStatus(statusPrefix + "Blad");
+                MessageBox.Show("Blad (" + rawUrl + "): " + ex.Message, "Blad", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
             }
         }
 

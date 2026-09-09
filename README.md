@@ -105,6 +105,11 @@ dotnet run
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
+Dla komputerów z procesorem ARM (np. Windows on ARM) zamień `win-x64` na `win-arm64`:
+```bash
+dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true
+```
+
 **Framework-dependent:**
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained false
@@ -114,6 +119,7 @@ Plik wykonywalny zostanie utworzony w:
 ```
 bin/Release/net10.0-windows/win-x64/publish/
 ```
+(dla `win-arm64` odpowiednio w `bin/Release/net10.0-windows/win-arm64/publish/`)
 
 ### 🚀 Użytkowanie
 
@@ -242,6 +248,11 @@ dotnet run
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
+For ARM-based PCs (e.g. Windows on ARM), swap `win-x64` for `win-arm64`:
+```bash
+dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true
+```
+
 **Framework-dependent:**
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained false
@@ -251,6 +262,7 @@ The executable will be created in:
 ```
 bin/Release/net10.0-windows/win-x64/publish/
 ```
+(for `win-arm64`, respectively in `bin/Release/net10.0-windows/win-arm64/publish/`)
 
 ### 🚀 Usage
 
