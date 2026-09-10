@@ -32,11 +32,11 @@ public partial class MainWindow : Window
     {
         httpClient = new HttpClient();
         appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        ytDlpPath = Path.Combine(appDirectory, "yt-dlp.exe");
+        ytDlpPath = Path.Combine(appDirectory, OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp");
         ffmpegBinPath = Path.Combine(appDirectory, "ffmpeg_bin");
-        denoPath = Path.Combine(appDirectory, "deno.exe");
+        denoPath = Path.Combine(appDirectory, OperatingSystem.IsWindows() ? "deno.exe" : "deno");
         denoVersionPath = Path.Combine(appDirectory, "deno_version.txt");
-        nodeJsPath = Path.Combine(appDirectory, "node.exe");
+        nodeJsPath = Path.Combine(appDirectory, OperatingSystem.IsWindows() ? "node.exe" : "node");
 
         InitializeComponent();
 
@@ -172,7 +172,7 @@ public partial class MainWindow : Window
         {
             var processInfo = new ProcessStartInfo
             {
-                FileName = "where",
+                FileName = OperatingSystem.IsWindows() ? "where" : "which",
                 Arguments = "deno",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -202,7 +202,7 @@ public partial class MainWindow : Window
         {
             var processInfo = new ProcessStartInfo
             {
-                FileName = "where",
+                FileName = OperatingSystem.IsWindows() ? "where" : "which",
                 Arguments = "deno",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
@@ -445,6 +445,17 @@ public partial class MainWindow : Window
         }
 
         ProgressBarDownload.Value = 0;
+    }
+
+    private static void MakeExecutable(string path)
+    {
+        if (OperatingSystem.IsWindows())
+            return;
+
+        File.SetUnixFileMode(path,
+            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
+            UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
+            UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
     }
 
     private async Task CheckAndUpdateDeno()
@@ -777,7 +788,8 @@ public partial class MainWindow : Window
         try
         {
             string normalizedUrl = NormalizeUrl(rawUrl);
-            string jsRuntimeArg = runtimePath.EndsWith("deno.exe", StringComparison.OrdinalIgnoreCase) ? "" : "--js-runtimes node";
+            string denoExeName = OperatingSystem.IsWindows() ? "deno.exe" : "deno";
+            string jsRuntimeArg = runtimePath.EndsWith(denoExeName, StringComparison.OrdinalIgnoreCase) ? "" : "--js-runtimes node";
             string ytDlpArgs = BuildYtDlpArguments();
             string downloadsDir = Path.Combine(appDirectory, "downloads");
             string outputPattern = Path.Combine(downloadsDir, "%(title)s.%(ext)s");
