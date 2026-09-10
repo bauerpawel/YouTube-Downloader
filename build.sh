@@ -15,11 +15,14 @@ fi
 PROJECT="YouTubeDownloader.csproj"
 
 RID="${1:-linux-x64}"
-if [ "$RID" != "linux-x64" ] && [ "$RID" != "linux-arm64" ]; then
-    echo "[BLAD] Nieznana architektura \"$RID\". Uzyj linux-x64 lub linux-arm64."
-    echo "Przyklad: ./build.sh linux-arm64"
-    exit 1
-fi
+case "$RID" in
+    linux-x64|linux-arm64|osx-x64|osx-arm64) ;;
+    *)
+        echo "[BLAD] Nieznana architektura \"$RID\". Uzyj linux-x64, linux-arm64, osx-x64 lub osx-arm64."
+        echo "Przyklad: ./build.sh osx-arm64"
+        exit 1
+        ;;
+esac
 
 OUTPUT="publish/$RID"
 
@@ -49,4 +52,4 @@ echo "  Gotowe! Plik wykonywalny znajduje sie w:"
 echo "  $(pwd)/$OUTPUT/YouTubeDownloader"
 echo "============================================"
 echo
-echo "Wskazowka: aby zbudowac dla ARM64, uruchom: ./build.sh linux-arm64"
+echo "Wskazowka: inne architektury: ./build.sh linux-arm64 | ./build.sh osx-x64 | ./build.sh osx-arm64"
