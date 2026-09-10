@@ -232,10 +232,14 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsWindows())
             return "deno-x86_64-pc-windows-msvc.zip";
 
-        if (!OperatingSystem.IsLinux())
-            throw new PlatformNotSupportedException("Deno auto-download is only supported on Windows and Linux.");
-
         bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+
+        if (OperatingSystem.IsMacOS())
+            return isArm ? "deno-aarch64-apple-darwin.zip" : "deno-x86_64-apple-darwin.zip";
+
+        if (!OperatingSystem.IsLinux())
+            throw new PlatformNotSupportedException("Deno auto-download is only supported on Windows, Linux, and macOS.");
+
         return isArm ? "deno-aarch64-unknown-linux-gnu.zip" : "deno-x86_64-unknown-linux-gnu.zip";
     }
 
@@ -322,8 +326,11 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsWindows())
             return "yt-dlp.exe";
 
+        if (OperatingSystem.IsMacOS())
+            return "yt-dlp_macos";
+
         if (!OperatingSystem.IsLinux())
-            throw new PlatformNotSupportedException("yt-dlp auto-download is only supported on Windows and Linux.");
+            throw new PlatformNotSupportedException("yt-dlp auto-download is only supported on Windows, Linux, and macOS.");
 
         bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
         return isArm ? "yt-dlp_linux_aarch64" : "yt-dlp_linux";
