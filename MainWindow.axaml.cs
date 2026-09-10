@@ -338,6 +338,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private static bool IsMatchingFFmpegAsset(string assetName)
+    {
+        if (OperatingSystem.IsWindows())
+            return assetName.Contains("win64-gpl-shared") && assetName.EndsWith(".zip");
+
+        bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+        string suffix = isArm ? "linuxarm64-gpl.tar.xz" : "linux64-gpl.tar.xz";
+        return assetName.EndsWith(suffix);
+    }
+
     private async Task<(string downloadUrl, string version)> GetLatestFFmpegInfo()
     {
         try
@@ -363,7 +373,7 @@ public partial class MainWindow : Window
                     foreach (var asset in assets.EnumerateArray())
                     {
                         string assetName = asset.GetProperty("name").GetString() ?? "";
-                        if (assetName.Contains("win64-gpl-shared") && assetName.EndsWith(".zip"))
+                        if (IsMatchingFFmpegAsset(assetName))
                         {
                             downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
                             break;
@@ -384,6 +394,39 @@ public partial class MainWindow : Window
         }
     }
 
+    private static async Task ExtractArchive(string archivePath, string destinationPath)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            ZipFile.ExtractToDirectory(archivePath, destinationPath);
+            return;
+        }
+
+        Directory.CreateDirectory(destinationPath);
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "tar",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardError = true
+        };
+        processInfo.ArgumentList.Add("-xf");
+        processInfo.ArgumentList.Add(archivePath);
+        processInfo.ArgumentList.Add("-C");
+        processInfo.ArgumentList.Add(destinationPath);
+
+        using var process = Process.Start(processInfo);
+        if (process == null)
+            throw new Exception("Nie udalo sie uruchomic tar");
+
+        await process.WaitForExitAsync();
+        if (process.ExitCode != 0)
+        {
+            string error = await process.StandardError.ReadToEndAsync();
+            throw new Exception("tar zakonczyl sie bledem: " + error);
+        }
+    }
+
     private async Task DownloadFFmpeg()
     {
         try
@@ -395,9 +438,10 @@ public partial class MainWindow : Window
                 throw new Exception("Nie znaleziono linku do FFmpeg");
 
             UpdateStatus("Pobieranie FFmpeg (" + version + ")...");
-            string zipPath = Path.Combine(appDirectory, "ffmpeg.zip");
+            string archiveExtension = OperatingSystem.IsWindows() ? ".zip" : ".tar.xz";
+            string archivePath = Path.Combine(appDirectory, "ffmpeg" + archiveExtension);
 
-            await DownloadFileWithProgress(downloadUrl, zipPath);
+            await DownloadFileWithProgress(downloadUrl, archivePath);
 
             UpdateStatus("Rozpakowywanie FFmpeg...");
 
@@ -408,7 +452,7 @@ public partial class MainWindow : Window
             if (Directory.Exists(tempExtractPath))
                 Directory.Delete(tempExtractPath, true);
 
-            ZipFile.ExtractToDirectory(zipPath, tempExtractPath);
+            await ExtractArchive(archivePath, tempExtractPath);
 
             string[] binPaths = Directory.GetDirectories(tempExtractPath, "bin", SearchOption.AllDirectories);
 
@@ -423,12 +467,13 @@ public partial class MainWindow : Window
                 string fileName = Path.GetFileName(file);
                 string destFile = Path.Combine(ffmpegBinPath, fileName);
                 File.Copy(file, destFile, true);
+                MakeExecutable(destFile);
             }
 
             string versionFile = Path.Combine(appDirectory, "ffmpeg_version.txt");
             await File.WriteAllTextAsync(versionFile, version);
 
-            File.Delete(zipPath);
+            File.Delete(archivePath);
             Directory.Delete(tempExtractPath, true);
 
             UpdateStatus("FFmpeg pobrane. Wersja: " + version);
