@@ -9,6 +9,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -63,7 +64,22 @@ public partial class MainWindow : Window
         MiAktualizujKomponenty.Click += async (s, e) => await AktualizujKomponenty_Click();
         MiInformacje.Click += async (s, e) => await Informacje_Click();
 
+        MiThemeLight.Click += (s, e) => SetTheme("Light");
+        MiThemeDark.Click += (s, e) => SetTheme("Dark");
+        MiThemeSystem.Click += (s, e) => SetTheme("Default");
+
+        string currentTheme = ThemeSettings.Load(appDirectory);
+        MiThemeLight.IsChecked = currentTheme == "Light";
+        MiThemeDark.IsChecked = currentTheme == "Dark";
+        MiThemeSystem.IsChecked = currentTheme == "Default";
+
         Opened += (s, e) => CheckAndDownloadComponents();
+    }
+
+    private void SetTheme(string name)
+    {
+        Application.Current!.RequestedThemeVariant = ThemeSettings.ToVariant(name);
+        ThemeSettings.Save(appDirectory, name);
     }
 
     protected override void OnClosed(EventArgs e)
