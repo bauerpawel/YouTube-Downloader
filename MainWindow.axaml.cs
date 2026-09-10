@@ -410,6 +410,49 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string GetFFmpegMacAssetName(bool isFFprobe)
+    {
+        bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+        string arch = isArm ? "arm64" : "x64";
+        return (isFFprobe ? "ffprobe-darwin-" : "ffmpeg-darwin-") + arch;
+    }
+
+    private async Task<(string ffmpegUrl, string ffprobeUrl, string version)> GetLatestFFmpegInfoMac()
+    {
+        try
+        {
+            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("YouTubeDownloader/1.0");
+            string apiUrl = "https://api.github.com/repos/eugeneware/ffmpeg-static/releases/latest";
+
+            var response = await httpClient.GetStringAsync(apiUrl);
+            var jsonDoc = JsonDocument.Parse(response);
+            var root = jsonDoc.RootElement;
+
+            string version = root.GetProperty("tag_name").GetString() ?? "";
+            string ffmpegAssetName = GetFFmpegMacAssetName(isFFprobe: false);
+            string ffprobeAssetName = GetFFmpegMacAssetName(isFFprobe: true);
+
+            string ffmpegUrl = "";
+            string ffprobeUrl = "";
+            var assets = root.GetProperty("assets");
+            foreach (var asset in assets.EnumerateArray())
+            {
+                string name = asset.GetProperty("name").GetString() ?? "";
+                if (name == ffmpegAssetName)
+                    ffmpegUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
+                else if (name == ffprobeAssetName)
+                    ffprobeUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
+            }
+
+            return (ffmpegUrl, ffprobeUrl, version);
+        }
+        catch (Exception ex)
+        {
+            await MessageDialog.ShowAsync(this, "Blad pobierania informacji FFmpeg: " + ex.Message, "Blad");
+            return ("", "", "");
+        }
+    }
+
     private static async Task ExtractArchive(string archivePath, string destinationPath)
     {
         if (OperatingSystem.IsWindows())
@@ -445,6 +488,12 @@ public partial class MainWindow : Window
 
     private async Task DownloadFFmpeg()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            await DownloadFFmpegMac();
+            return;
+        }
+
         try
         {
             UpdateStatus("Pobieranie informacji FFmpeg...");
@@ -491,6 +540,43 @@ public partial class MainWindow : Window
 
             File.Delete(archivePath);
             Directory.Delete(tempExtractPath, true);
+
+            UpdateStatus("FFmpeg pobrane. Wersja: " + version);
+        }
+        catch (Exception ex)
+        {
+            await MessageDialog.ShowAsync(this, "Blad FFmpeg: " + ex.Message, "Blad");
+            UpdateStatus("Blad: " + ex.Message);
+        }
+    }
+
+    private async Task DownloadFFmpegMac()
+    {
+        try
+        {
+            UpdateStatus("Pobieranie informacji FFmpeg...");
+            var (ffmpegUrl, ffprobeUrl, version) = await GetLatestFFmpegInfoMac();
+
+            if (string.IsNullOrEmpty(ffmpegUrl) || string.IsNullOrEmpty(ffprobeUrl))
+                throw new Exception("Nie znaleziono linku do FFmpeg");
+
+            UpdateStatus("Pobieranie FFmpeg (" + version + ")...");
+
+            if (Directory.Exists(ffmpegBinPath))
+                Directory.Delete(ffmpegBinPath, true);
+            Directory.CreateDirectory(ffmpegBinPath);
+
+            string ffmpegDestPath = Path.Combine(ffmpegBinPath, "ffmpeg");
+            string ffprobeDestPath = Path.Combine(ffmpegBinPath, "ffprobe");
+
+            await DownloadFileWithProgress(ffmpegUrl, ffmpegDestPath);
+            MakeExecutable(ffmpegDestPath);
+
+            await DownloadFileWithProgress(ffprobeUrl, ffprobeDestPath);
+            MakeExecutable(ffprobeDestPath);
+
+            string versionFile = Path.Combine(appDirectory, "ffmpeg_version.txt");
+            await File.WriteAllTextAsync(versionFile, version);
 
             UpdateStatus("FFmpeg pobrane. Wersja: " + version);
         }
@@ -583,7 +669,11 @@ public partial class MainWindow : Window
     {
         try
         {
-            var (_, latestVersion) = await GetLatestFFmpegInfo();
+            string latestVersion;
+            if (OperatingSystem.IsMacOS())
+                (_, _, latestVersion) = await GetLatestFFmpegInfoMac();
+            else
+                (_, latestVersion) = await GetLatestFFmpegInfo();
 
             string versionFile = Path.Combine(appDirectory, "ffmpeg_version.txt");
             string currentVersion = "";
