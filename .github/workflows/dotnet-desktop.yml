@@ -1,4 +1,4 @@
-# This workflow builds and publishes the YouTube Downloader .NET Windows Forms application
+# This workflow builds and publishes the YouTube Downloader .NET Avalonia application
 
 name: .NET Desktop
 
@@ -22,7 +22,7 @@ jobs:
       matrix:
         configuration: [Debug, Release]
 
-    runs-on: windows-latest  # Windows required for Windows Forms
+    runs-on: windows-latest  # Windows required for this phase (Avalonia UI, Windows-only for now)
 
     steps:
     - name: Checkout
@@ -58,7 +58,7 @@ jobs:
       matrix:
         rid: [win-x64, win-arm64]
 
-    runs-on: windows-latest  # Windows required for Windows Forms
+    runs-on: windows-latest  # Windows required for this phase (Avalonia UI, Windows-only for now)
 
     steps:
     - name: Checkout
