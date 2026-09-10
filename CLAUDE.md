@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-**YouTube Downloader** is a Windows desktop application built with .NET 10 and Avalonia UI that enables users to download videos and audio from YouTube, including from multiple links in a single run. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish-language interface for selecting download quality and format.
+**YouTube Downloader** is a Windows and Linux desktop application built with .NET 10 and Avalonia UI that enables users to download videos and audio from YouTube, including from multiple links in a single run. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish-language interface for selecting download quality and format.
 
 ### Key Information
 - **Technology Stack**: .NET 10, C# 13, Avalonia UI 12.1.2
-- **Target Platform**: Windows (net10.0)
+- **Target Platform**: Windows and Linux (x64/ARM64), `net10.0`. Built and published for both OSes, and CI-smoke-tested on `ubuntu-latest` in addition to `windows-latest` - see [Development Workflows](#development-workflows). macOS is not supported yet (tracked under Future Improvements)
 - **License**: Apache License 2.0
 - **Primary Language**: C# with Polish UI text
 - **Architecture**: Avalonia UI application (XAML + code-behind, no MVVM) with external dependency management
@@ -31,13 +31,16 @@ YouTube-Downloader/
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
 ├── app.ico                      # Application/window icon
 ├── logo.svg                     # Source application logo (SVG)
-├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64
+├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64 (Windows)
+├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64 (Linux)
 ├── README.md                    # Project documentation
 ├── LICENSE                      # Apache 2.0 license
 └── CLAUDE.md                    # This file - AI assistant guide
 ```
 
 ### Runtime Structure (Created at Runtime)
+
+On Windows:
 ```
 Application Directory/
 ├── yt-dlp.exe                  # YouTube downloader CLI tool
@@ -47,11 +50,13 @@ Application Directory/
 ├── ffmpeg_bin/                 # FFmpeg binaries directory
 │   ├── ffmpeg.exe
 │   ├── ffprobe.exe
-│   └── *.dll                   # FFmpeg shared libraries
+│   └── *.dll                   # FFmpeg shared libraries (win64-gpl-shared build)
 ├── ffmpeg_version.txt          # Tracks current FFmpeg version
 └── downloads/                  # Default download location
     └── (downloaded videos)
 ```
+
+On Linux, the layout is identical but every binary lacks the `.exe` extension (`yt-dlp`, `deno`, `node`), and `ffmpeg_bin/` holds only `ffmpeg`/`ffprobe` - no `*.so` companions, because the Linux download is the **static** FFmpeg build rather than `-shared` (see Dependency Management below for why). All downloaded/extracted binaries are marked executable via `MakeExecutable()` since neither the raw HTTP download nor `tar`/`ZipFile` extraction preserves the Unix executable bit.
 
 ## Codebase Architecture
 
@@ -88,24 +93,43 @@ Named elements (`Name`) become strongly-typed, non-nullable code-behind fields a
 - Enables/disables all URL inputs and the add button while a download is running
 
 #### 3. Dependency Management (`MainWindow.axaml.cs`)
+
+All three dependency downloaders are OS-conditional (checked via `OperatingSystem.IsWindows()` and, on non-Windows, `RuntimeInformation.ProcessArchitecture` to distinguish x64 vs ARM64). Windows behavior is unchanged from the original WinForms/single-OS app; Linux (x64 + ARM64) is a parallel code path added alongside it, not a replacement.
+
 **CheckAndDownloadComponents()**
 - Checks for Deno/Node.js runtime availability (`IsRuntimeInPath()`)
 - Downloads yt-dlp if missing, FFmpeg if missing
 - All operations are async and report progress via `UpdateStatus()`
 
-**DownloadDeno() / GetLatestDenoInfo()**
-- Queries the GitHub API for the latest Deno release
-- Downloads the Windows x86_64 MSVC build, extracts `deno.exe` from the zip
+**IsRuntimeInPath() / CheckAndUpdateDeno()'s "is a system runtime installed" check**
+- Shells out to `where deno` on Windows, `which deno` on Linux (`OperatingSystem.IsWindows() ? "where" : "which"`) to detect a system-wide Deno/Node install
+
+**GetDenoAssetName() / DownloadDeno() / GetLatestDenoInfo()**
+- Queries the GitHub API for the latest Deno release, picks the matching asset by name via `GetDenoAssetName()`:
+  - Windows: `deno-x86_64-pc-windows-msvc.zip`
+  - Linux x64: `deno-x86_64-unknown-linux-gnu.zip`; Linux ARM64: `deno-aarch64-unknown-linux-gnu.zip` (pattern: `deno-*-unknown-linux-gnu.zip`)
+- Extracts the entry named `deno.exe` (Windows) or `deno` (Linux) from the zip via `ZipFile` (Deno's release asset is always a zip on both OSes, so this path doesn't need the `tar` handling FFmpeg needs)
+- Calls `MakeExecutable(denoPath)` after extraction (no-op on Windows)
 - Writes the installed version to `deno_version.txt` so `CheckAndUpdateDeno()` can detect updates later
 - Handles errors gracefully via `MessageDialog`, with fallback instructions
 
-**DownloadYtDlp()**
-- Downloads the latest `yt-dlp.exe` from GitHub releases (direct file download, no unpacking)
+**GetYtDlpAssetName() / DownloadYtDlp()**
+- Downloads the latest yt-dlp release asset chosen by `GetYtDlpAssetName()` (direct file download, no unpacking - yt-dlp publishes single binaries per OS/arch):
+  - Windows: `yt-dlp.exe`
+  - Linux x64: `yt-dlp_linux`; Linux ARM64: `yt-dlp_linux_aarch64`
+- Calls `MakeExecutable(ytDlpPath)` after download, since a raw HTTP download has no executable bit on Linux
 
-**DownloadFFmpeg() / GetLatestFFmpegInfo()**
-- Uses the GitHub API to find the latest FFmpeg autobuild (BtbN/FFmpeg-Builds)
-- Downloads the `win64-gpl-shared` build, extracts the `bin` directory contents
+**IsMatchingFFmpegAsset() / DownloadFFmpeg() / GetLatestFFmpegInfo()**
+- Uses the GitHub API to find the latest FFmpeg autobuild (BtbN/FFmpeg-Builds) and picks the release asset matching `IsMatchingFFmpegAsset()`:
+  - Windows: name contains `win64-gpl-shared` and ends with `.zip`
+  - Linux x64: ends with `linux64-gpl.tar.xz`; Linux ARM64: ends with `linuxarm64-gpl.tar.xz`
+- **The Linux variant is deliberately the static `gpl` build, not `gpl-shared`.** BtbN's Windows `-shared` build puts `ffmpeg.exe`/`ffprobe.exe` and their `*.dll`s together in one `bin/` folder, which Windows' DLL search order resolves automatically. BtbN's Linux `-shared` build instead splits the executables (`bin/`) from their `*.so` libraries (`lib/`), which requires setting `LD_LIBRARY_PATH` (or embedding an rpath) for the executables to find their shared libraries at runtime. The static `gpl` build sidesteps that entirely: `ffmpeg`/`ffprobe` are single self-contained binaries with everything linked in, so the same "find `bin/`, copy every file in it into `ffmpeg_bin/`" logic that already works for Windows works unmodified for Linux, with no `lib/`-copying or environment-variable step needed
+- Extracts via `ExtractArchive()`: on Windows, `ZipFile.ExtractToDirectory` (unchanged); on Linux, shells out to the system `tar` command (`tar -xf <archive> -C <destination>`) since the download is a `.tar.xz`, which `System.IO.Compression.ZipFile` cannot open
+- After copying each file from the extracted `bin/` into `ffmpeg_bin/`, calls `MakeExecutable()` on it
 - Stores version information in `ffmpeg_version.txt` for update checks
+
+**MakeExecutable()**
+- No-op on Windows. On Linux, calls `File.SetUnixFileMode()` to set `rwxr-xr-x` (user read/write/execute, group/other read/execute) on the given path. Needed because neither a plain HTTP download nor `ZipFile`/`tar` extraction preserves (or sets) the Unix executable bit, so every downloaded yt-dlp/Deno/FFmpeg binary would otherwise be non-executable on first run
 
 **DownloadFileWithProgress()**
 - Shared helper: streams an HTTP download to disk while reporting progress on `ProgressBarDownload`
@@ -191,9 +215,18 @@ dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFil
 
 # Or use build.bat, which wraps the above (defaults to win-x64):
 build.bat win-arm64
+
+# Publish single-file executable (Linux x64)
+dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
+
+# Publish single-file executable (Linux ARM64)
+dotnet publish -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true
+
+# Or use build.sh, which wraps the above (defaults to linux-x64):
+./build.sh linux-arm64
 ```
 
-CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes both `win-x64` and `win-arm64` on every push to `main`, attaching both to the automated GitHub Release. The app remains Windows-only in practice even though Avalonia itself is cross-platform: dependency downloads target Windows binaries (`yt-dlp.exe`, `deno.exe`, Windows FFmpeg builds) and runtime detection shells out to the Windows-only `where` command.
+CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes all four RIDs - `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64` - on every push to `main`, running across `windows-latest` and `ubuntu-latest` runners and attaching all four artifacts to the automated GitHub Release; the Linux jobs additionally run a headless launch smoke-test under `xvfb-run` (see Testing Changes below). Dependency downloads and runtime detection are now OS-conditional rather than Windows-only: Windows targets `yt-dlp.exe`/`deno.exe`/the `win64-gpl-shared` FFmpeg build and shells out to `where`, while Linux targets the `yt-dlp_linux*`/`deno-*-unknown-linux-gnu.zip`/static-`gpl` FFmpeg assets and shells out to `which` (see Dependency Management above for the full OS split). macOS is not covered by any of this and remains unsupported (see Future Improvements).
 
 ### Testing Changes
 
@@ -202,7 +235,7 @@ CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes both `win-x64` 
 3. **Dependency Management**: Modify the download methods in `MainWindow.axaml.cs` (`DownloadDeno()`, `DownloadYtDlp()`, `DownloadFFmpeg()`)
 4. **Download Logic**: Update `BtnDownload_Click()` / `DownloadSingleUrlAsync()` and related methods
 
-This environment has no GUI test automation - there is no headless/CI-runnable UI test suite. Verification here is a successful `dotnet build` plus a manual smoke-launch of the app; actual UI rendering and yt-dlp/FFmpeg download behavior can only be confirmed by running the app on Windows (see Testing Checklist below).
+This environment has no full GUI test automation - there is no headless/CI-runnable UI *interaction* test suite on either OS. On Windows, verification is a successful `dotnet build` plus a manual smoke-launch of the app; actual UI rendering and yt-dlp/FFmpeg download behavior can only be confirmed by running the app locally (see Testing Checklist below). On Linux, CI additionally runs a headless launch-only smoke-test under `xvfb-run` on `ubuntu-latest`, which confirms the app starts without crashing but does not exercise real downloads or interactive UI - narrower coverage than the Windows manual pass, not a substitute for it.
 
 ### Debugging Tips
 
@@ -260,10 +293,10 @@ This environment has no GUI test automation - there is no headless/CI-runnable U
 4. **HTTPS Only**: All downloads use HTTPS (GitHub, yt-dlp)
 
 ### Dependency Versions
-- **yt-dlp**: Always latest from GitHub releases
-- **FFmpeg**: Latest autobuild from BtbN/FFmpeg-Builds (win64-gpl-shared)
-- **Deno**: Latest release from denoland/deno (x86_64-pc-windows-msvc)
-- **Runtime Detection**: Checks for Deno in PATH using `where deno` command
+- **yt-dlp**: Always latest from GitHub releases (Windows: `yt-dlp.exe`; Linux: `yt-dlp_linux`/`yt-dlp_linux_aarch64`)
+- **FFmpeg**: Latest autobuild from BtbN/FFmpeg-Builds (Windows: `win64-gpl-shared`; Linux: static `gpl` build - `linux64-gpl.tar.xz`/`linuxarm64-gpl.tar.xz`, see Dependency Management above for why static rather than shared)
+- **Deno**: Latest release from denoland/deno (Windows: `x86_64-pc-windows-msvc`; Linux: `x86_64-unknown-linux-gnu`/`aarch64-unknown-linux-gnu`)
+- **Runtime Detection**: Checks for a system Deno/Node install in PATH using `where deno` (Windows) or `which deno` (Linux)
 
 ### yt-dlp Integration
 The application passes specific arguments based on user selections:
@@ -376,7 +409,7 @@ using (var process = Process.Start(processInfo))
 2. **Verify paths** - ensure `Path.Combine()` usage
 3. **Test process execution** - check redirected output handling
 4. **Validate regex patterns** - test with actual yt-dlp output
-5. **Consider Windows specifics** - file paths, process commands; the app is still Windows-only in practice (see Development Workflows)
+5. **Consider both Windows and Linux specifics** when touching dependency-management or process-execution code - file paths, process commands, and the OS-conditional branches (`OperatingSystem.IsWindows()`, per-OS asset names/extraction - see Dependency Management above)
 
 ### When Refactoring
 1. **Preserve Avalonia patterns** - event handlers wired in the constructor (not XAML `Click=` attributes), `Dispatcher.UIThread.Post()` for cross-thread UI updates
@@ -395,7 +428,7 @@ using (var process = Process.Start(processInfo))
 
 ## Testing Checklist
 
-This project has no GUI test automation in this environment. There is no headless/CI-runnable UI test suite, so verification of anything below beyond a clean build requires a manual smoke-launch and QA pass on Windows.
+This project has no full GUI interaction test automation. There is no headless/CI-runnable UI interaction test suite, so verification of anything below beyond a clean build requires a manual smoke-launch and QA pass on Windows; on Linux, CI covers only a headless launch-only smoke-test (see Testing Changes above), so most items below are effectively Windows-verified only unless someone confirms them manually on Linux too.
 
 Before committing changes, verify:
 - [ ] Application builds without warnings
@@ -422,7 +455,7 @@ Before committing changes, verify:
 
 - **FFmpeg**: Audio/video processing
   - Source: https://github.com/BtbN/FFmpeg-Builds
-  - License: GPL (gpl-shared build)
+  - License: GPL (Windows: `gpl-shared` build; Linux: static `gpl` build - see Dependency Management above)
 
 - **Deno**: JavaScript/TypeScript runtime for yt-dlp
   - Source: https://github.com/denoland/deno
@@ -469,6 +502,6 @@ This project follows standard Git practices:
 
 ---
 
-**Last Updated**: 2026-09-09
+**Last Updated**: 2026-09-10
 **For**: AI Assistants (Claude, etc.)
-**Project**: YouTube Downloader for Windows (.NET 10)
+**Project**: YouTube Downloader for Windows and Linux (.NET 10)
