@@ -25,7 +25,7 @@ jobs:
     strategy:
       matrix:
         configuration: [Debug, Release]
-        os: [windows-latest, ubuntu-latest]
+        os: [windows-latest, ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -78,6 +78,14 @@ jobs:
             os: ubuntu-latest
             exeName: YouTubeDownloader
             releaseExeName: YouTubeDownloader-linux-arm64
+          - rid: osx-x64
+            os: macos-latest
+            exeName: YouTubeDownloader
+            releaseExeName: YouTubeDownloader-osx-x64
+          - rid: osx-arm64
+            os: macos-latest
+            exeName: YouTubeDownloader
+            releaseExeName: YouTubeDownloader-osx-arm64
 
     runs-on: ${{ matrix.os }}
 
@@ -111,19 +119,19 @@ jobs:
 
     # ZIP/copy steps below don't reliably preserve the Unix executable bit across
     # platforms, so the binary is (re-)marked executable at each point it's used.
-    - name: Mark binary executable (Linux)
-      if: runner.os == 'Linux'
+    - name: Mark binary executable (Linux/macOS)
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
       run: chmod +x ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
 
     # Headless smoke-test: the only real proof (in this whole project) that the
-    # Linux dependency-download logic (Tasks 1-3) actually works, since local
-    # development happens on Windows. linux-x64 only: ubuntu-latest is an x86-64
-    # runner and cannot execute an aarch64 binary without QEMU/binfmt_misc
-    # registration, which this workflow does not set up. Runs against a copy in
-    # an isolated temp directory (not ./publish/<rid>/), since the app downloads
-    # its own dependencies on startup and that directory gets zipped/uploaded as
-    # the release artifact.
+    # Linux dependency-download logic (added in the Linux support phase) actually
+    # works, since local development happens on Windows. linux-x64 only:
+    # ubuntu-latest is an x86-64 runner and cannot execute an aarch64 binary
+    # without QEMU/binfmt_misc registration, which this workflow does not set up.
+    # Runs against a copy in an isolated temp directory (not ./publish/<rid>/),
+    # since the app downloads its own dependencies on startup and that directory
+    # gets zipped/uploaded as the release artifact.
     - name: Smoke-test published binary (linux-x64 only)
       if: matrix.rid == 'linux-x64'
       shell: bash
@@ -146,6 +154,53 @@ jobs:
         fi
         if [ -x "$SMOKE/yt-dlp" ] && [ -x "$SMOKE/ffmpeg_bin/ffmpeg" ]; then
           echo "yt-dlp and ffmpeg were downloaded and are executable - Linux dependency logic verified"
+        else
+          echo "App is running, but yt-dlp/ffmpeg were not downloaded/executable as expected"
+          ls -la "$SMOKE" "$SMOKE/ffmpeg_bin" 2>&1
+          cat "$SMOKE/app.log"
+          pkill -f "$SMOKE/${{ matrix.exeName }}" || true
+          exit 1
+        fi
+        pkill -f "$SMOKE/${{ matrix.exeName }}" || true
+        kill $APP_PID 2>/dev/null || true
+        rm -rf "$SMOKE"
+
+    # osx-x64 runs on the ARM64 macos-latest runner via Rosetta 2, which is not
+    # preinstalled - it must be explicitly installed before the smoke-test step
+    # below can execute the x64 binary. Not needed for osx-arm64 (runs natively)
+    # or for the publish step above (a pure cross-compile, independent of host arch).
+    - name: Install Rosetta (osx-x64 on ARM64 runner)
+      if: matrix.rid == 'osx-x64'
+      shell: bash
+      run: sudo softwareupdate --install-rosetta --agree-to-license
+
+    # Headless smoke-test: the only real proof (in this whole project) that the
+    # macOS dependency-download logic (Task 2) actually works, since local
+    # development happens on Windows. Runs against a copy in an isolated temp
+    # directory (not ./publish/<rid>/), since the app downloads its own
+    # dependencies on startup and that directory gets zipped/uploaded as the
+    # release artifact. Runs for both osx-x64 (via Rosetta, installed above) and
+    # osx-arm64 (native) - both are runner.os == 'macOS' on this single runner.
+    - name: Smoke-test published binary (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: |
+        SMOKE="$RUNNER_TEMP/smoke"
+        mkdir -p "$SMOKE"
+        cp ./publish/${{ matrix.rid }}/${{ matrix.exeName }} "$SMOKE/"
+        chmod +x "$SMOKE/${{ matrix.exeName }}"
+        "$SMOKE/${{ matrix.exeName }}" > "$SMOKE/app.log" 2>&1 &
+        APP_PID=$!
+        sleep 60
+        if kill -0 $APP_PID 2>/dev/null; then
+          echo "App is running (PID $APP_PID) after 60s"
+        else
+          echo "App failed to start or crashed"
+          cat "$SMOKE/app.log"
+          exit 1
+        fi
+        if [ -x "$SMOKE/yt-dlp" ] && [ -x "$SMOKE/ffmpeg_bin/ffmpeg" ] && [ -x "$SMOKE/ffmpeg_bin/ffprobe" ]; then
+          echo "yt-dlp and ffmpeg/ffprobe were downloaded and are executable - macOS dependency logic verified"
         else
           echo "App is running, but yt-dlp/ffmpeg were not downloaded/executable as expected"
           ls -la "$SMOKE" "$SMOKE/ffmpeg_bin" 2>&1
@@ -186,8 +241,8 @@ jobs:
     - name: Prepare release asset names
       run: Copy-Item ./publish/${{ matrix.rid }}/${{ matrix.exeName }} ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
 
-    - name: Mark release asset executable (Linux)
-      if: runner.os == 'Linux'
+    - name: Mark release asset executable (Linux/macOS)
+      if: runner.os == 'Linux' || runner.os == 'macOS'
       shell: bash
       run: chmod +x ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
 
