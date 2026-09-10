@@ -2,11 +2,11 @@
 
 ## Project Overview
 
-**YouTube Downloader** is a Windows and Linux desktop application built with .NET 10 and Avalonia UI that enables users to download videos and audio from YouTube, including from multiple links in a single run. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish-language interface for selecting download quality and format.
+**YouTube Downloader** is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables users to download videos and audio from YouTube, including from multiple links in a single run. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish-language interface for selecting download quality and format.
 
 ### Key Information
 - **Technology Stack**: .NET 10, C# 13, Avalonia UI 12.1.2
-- **Target Platform**: Windows and Linux (x64/ARM64), `net10.0`. Built and published for both OSes, and CI-smoke-tested on `ubuntu-latest` in addition to `windows-latest` - see [Development Workflows](#development-workflows). macOS is not supported yet (tracked under Future Improvements)
+- **Target Platform**: Windows, Linux, and macOS (x64/ARM64), `net10.0`. Built and published for all three OSes, and CI-smoke-tested on `ubuntu-latest` and `macos-latest` in addition to `windows-latest` - see [Development Workflows](#development-workflows). macOS binaries are unsigned (no Apple Developer account) - users see a one-time Gatekeeper warning on first launch, see [External Dependencies](#external-dependencies)
 - **License**: Apache License 2.0
 - **Primary Language**: C# with Polish UI text
 - **Architecture**: Avalonia UI application (XAML + code-behind, no MVVM) with external dependency management
@@ -32,7 +32,7 @@ YouTube-Downloader/
 ├── app.ico                      # Application/window icon
 ├── logo.svg                     # Source application logo (SVG)
 ├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64 (Windows)
-├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64 (Linux)
+├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64/osx-x64/osx-arm64
 ├── README.md                    # Project documentation
 ├── LICENSE                      # Apache 2.0 license
 └── CLAUDE.md                    # This file - AI assistant guide
@@ -58,6 +58,8 @@ Application Directory/
 ```
 
 On Linux, the layout is identical but every binary lacks the `.exe` extension (`yt-dlp`, `deno`, `node`), and `ffmpeg_bin/` holds `ffmpeg`/`ffprobe`/`ffplay` - no `*.so` companions, because the Linux download is the **static** FFmpeg build rather than `-shared` (see Dependency Management below for why). All downloaded/extracted binaries are marked executable via `MakeExecutable()` - strictly required for the raw HTTP download (yt-dlp has no archive to carry a Unix mode), and applied defensively after `tar`/`ZipFile` extraction too, since archive-recorded permissions can't always be relied on.
+
+On macOS, the layout is structurally different for FFmpeg specifically: the macOS FFmpeg source (`eugeneware/ffmpeg-static`) publishes two loose, already-executable binaries (`ffmpeg`, `ffprobe`) rather than an archive containing a `bin/` folder, so `ffmpeg_bin/` on macOS never holds anything beyond those two files - there is no `ffplay`, since `eugeneware/ffmpeg-static` doesn't publish one. yt-dlp on macOS, by contrast, is a single `universal2` binary (`yt-dlp_macos`) covering both x64 and ARM64 - unlike Deno and FFmpeg, there is no separate per-architecture asset to pick between.
 
 ## Codebase Architecture
 
@@ -111,7 +113,8 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - Queries the GitHub API for the latest Deno release, picks the matching asset by name via `GetDenoAssetName()`:
   - Windows: `deno-x86_64-pc-windows-msvc.zip`
   - Linux x64: `deno-x86_64-unknown-linux-gnu.zip`; Linux ARM64: `deno-aarch64-unknown-linux-gnu.zip` (pattern: `deno-*-unknown-linux-gnu.zip`)
-- Extracts the entry named `deno.exe` (Windows) or `deno` (Linux) from the zip via `ZipFile` (Deno's release asset is always a zip on both OSes, so this path doesn't need the `tar` handling FFmpeg needs)
+  - macOS x64: `deno-x86_64-apple-darwin.zip`; macOS ARM64: `deno-aarch64-apple-darwin.zip` (pattern: `deno-*-apple-darwin.zip`)
+- Extracts the entry named `deno.exe` (Windows) or `deno` (Linux and macOS - verified the internal zip entry name is `deno` on macOS too, so no extraction-logic difference is needed) from the zip via `ZipFile` (Deno's release asset is always a zip on every OS, so this path doesn't need the `tar` handling FFmpeg needs)
 - Calls `MakeExecutable(denoPath)` after extraction (no-op on Windows)
 - Writes the installed version to `deno_version.txt` so `CheckAndUpdateDeno()` can detect updates later
 - Handles errors gracefully via `MessageDialog`, with fallback instructions
@@ -120,9 +123,10 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - Downloads the latest yt-dlp release asset chosen by `GetYtDlpAssetName()` (direct file download, no unpacking - yt-dlp publishes single binaries per OS/arch):
   - Windows: `yt-dlp.exe`
   - Linux x64: `yt-dlp_linux`; Linux ARM64: `yt-dlp_linux_aarch64`
-- Calls `MakeExecutable(ytDlpPath)` after download, since a raw HTTP download has no executable bit on Linux
+  - macOS: `yt-dlp_macos` - a single `universal2` binary covering both x64 and ARM64, not split by architecture like the Linux/Deno assets
+- Calls `MakeExecutable(ytDlpPath)` after download, since a raw HTTP download has no executable bit on Linux/macOS
 
-**IsMatchingFFmpegAsset() / DownloadFFmpeg() / GetLatestFFmpegInfo()**
+**IsMatchingFFmpegAsset() / DownloadFFmpeg() / GetLatestFFmpegInfo()** - Windows and Linux only; macOS uses a separate download path (see the next bullet)
 - Uses the GitHub API to find the latest FFmpeg autobuild (BtbN/FFmpeg-Builds) and picks the release asset matching `IsMatchingFFmpegAsset()`:
   - Windows: name contains `win64-gpl-shared` and ends with `.zip`
   - Linux x64: ends with `linux64-gpl.tar.xz`; Linux ARM64: ends with `linuxarm64-gpl.tar.xz`
@@ -130,6 +134,12 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - Extracts via `ExtractArchive()`: on Windows, `ZipFile.ExtractToDirectory` (unchanged); on Linux, shells out to the system `tar` command (`tar -xf <archive> -C <destination>`) since the download is a `.tar.xz`, which `System.IO.Compression.ZipFile` cannot open
 - After copying each file from the extracted `bin/` into `ffmpeg_bin/`, calls `MakeExecutable()` on it
 - Stores version information in `ffmpeg_version.txt` for update checks
+
+**GetFFmpegMacAssetName() / GetLatestFFmpegInfoMac() / DownloadFFmpegMac()**
+- macOS FFmpeg comes from a different upstream entirely: `eugeneware/ffmpeg-static` (BtbN/FFmpeg-Builds does not publish macOS binaries)
+- `GetFFmpegMacAssetName()` matches assets by **exact name equality**, not substring/suffix matching: `ffmpeg-darwin-x64`/`ffmpeg-darwin-arm64` and `ffprobe-darwin-x64`/`ffprobe-darwin-arm64`. Exact equality is required specifically because the real `eugeneware/ffmpeg-static` release also publishes `.gz`/`.LICENSE`/`.README` sidecar assets whose names contain the target asset name as a substring - a substring/suffix check would false-match those
+- The two matched assets are raw executable binaries, not an archive - nothing is extracted; they're downloaded directly to `ffmpeg_bin/ffmpeg` and `ffmpeg_bin/ffprobe` and marked executable via the existing `MakeExecutable()` helper
+- `DownloadFFmpeg()` and `CheckAndUpdateFFmpeg()` both branch to this path via `OperatingSystem.IsMacOS()` before reaching any BtbN-specific code
 
 **MakeExecutable()**
 - No-op on Windows. On Linux, calls `File.SetUnixFileMode()` to set `rwxr-xr-x` (user read/write/execute, group/other read/execute) on the given path. Needed because neither a plain HTTP download nor `ZipFile`/`tar` extraction preserves (or sets) the Unix executable bit, so every downloaded yt-dlp/Deno/FFmpeg binary would otherwise be non-executable on first run
@@ -227,9 +237,18 @@ dotnet publish -c Release -r linux-arm64 --self-contained true -p:PublishSingleF
 
 # Or use build.sh, which wraps the above (defaults to linux-x64):
 ./build.sh linux-arm64
+
+# Publish single-file executable (macOS x64, Intel)
+dotnet publish -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true
+
+# Publish single-file executable (macOS ARM64, Apple Silicon)
+dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true
+
+# Or use build.sh, which wraps the above (defaults to linux-x64):
+./build.sh osx-arm64
 ```
 
-CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes all four RIDs - `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64` - on every push to `main`, running across `windows-latest` and `ubuntu-latest` runners and attaching all four artifacts to the automated GitHub Release; the Linux jobs additionally run a headless launch smoke-test under `xvfb-run` (see Testing Changes below). Dependency downloads and runtime detection are now OS-conditional rather than Windows-only: Windows targets `yt-dlp.exe`/`deno.exe`/the `win64-gpl-shared` FFmpeg build and shells out to `where`, while Linux targets the `yt-dlp_linux*`/`deno-*-unknown-linux-gnu.zip`/static-`gpl` FFmpeg assets and shells out to `which` (see Dependency Management above for the full OS split). macOS is not covered by any of this and remains unsupported (see Future Improvements).
+CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes all six RIDs - `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64` - on every push to `main`, running across `windows-latest`, `ubuntu-latest`, and `macos-latest` runners and attaching all six artifacts to the automated GitHub Release; the Linux jobs additionally run a headless launch smoke-test under `xvfb-run` (see Testing Changes below). The `macos-latest` runner is ARM64, so the `osx-x64` leg builds via cross-compilation and is smoke-tested there through Rosetta 2, which CI installs explicitly as its own step since it is not preinstalled on the runner image. Dependency downloads and runtime detection are now OS-conditional rather than Windows-only: Windows targets `yt-dlp.exe`/`deno.exe`/the `win64-gpl-shared` FFmpeg build and shells out to `where`; Linux targets the `yt-dlp_linux*`/`deno-*-unknown-linux-gnu.zip`/static-`gpl` FFmpeg assets and shells out to `which`; macOS targets `yt-dlp_macos`/`deno-*-apple-darwin.zip`/the `eugeneware/ffmpeg-static` binaries and also shells out to `which` (see Dependency Management above for the full OS split).
 
 ### Testing Changes
 
@@ -238,7 +257,7 @@ CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes all four RIDs -
 3. **Dependency Management**: Modify the download methods in `MainWindow.axaml.cs` (`DownloadDeno()`, `DownloadYtDlp()`, `DownloadFFmpeg()`)
 4. **Download Logic**: Update `BtnDownload_Click()` / `DownloadSingleUrlAsync()` and related methods
 
-This environment has no full GUI test automation - there is no headless/CI-runnable UI *interaction* test suite on either OS. On Windows, verification is a successful `dotnet build` plus a manual smoke-launch of the app; actual UI rendering and yt-dlp/FFmpeg download behavior can only be confirmed by running the app locally (see Testing Checklist below). On Linux, CI additionally runs a headless launch-only smoke-test under `xvfb-run` on `ubuntu-latest`, which confirms the app starts without crashing but does not exercise real downloads or interactive UI - narrower coverage than the Windows manual pass, not a substitute for it.
+This environment has no full GUI test automation - there is no headless/CI-runnable UI *interaction* test suite on any OS. On Windows, verification is a successful `dotnet build` plus a manual smoke-launch of the app; actual UI rendering and yt-dlp/FFmpeg download behavior can only be confirmed by running the app locally (see Testing Checklist below). On Linux, CI additionally runs a headless launch-only smoke-test under `xvfb-run` on `ubuntu-latest`, which confirms the app starts without crashing but does not exercise real downloads or interactive UI - narrower coverage than the Windows manual pass, not a substitute for it. macOS gets the same category of coverage as Linux: a CI launch-and-dependency-download smoke-test on `macos-latest`, not a manual interactive QA pass. Unlike the Linux job, the macOS smoke-test does not use a virtual-display wrapper like `xvfb-run` - it assumes `macos-latest` provides a usable GUI session out of the box. That assumption is unconfirmed until a real CI run proves it out (see this plan's Global Constraints and Task 4).
 
 ### Debugging Tips
 
@@ -296,10 +315,10 @@ This environment has no full GUI test automation - there is no headless/CI-runna
 4. **HTTPS Only**: All downloads use HTTPS (GitHub, yt-dlp)
 
 ### Dependency Versions
-- **yt-dlp**: Always latest from GitHub releases (Windows: `yt-dlp.exe`; Linux: `yt-dlp_linux`/`yt-dlp_linux_aarch64`)
-- **FFmpeg**: Latest autobuild from BtbN/FFmpeg-Builds (Windows: `win64-gpl-shared`; Linux: static `gpl` build - `linux64-gpl.tar.xz`/`linuxarm64-gpl.tar.xz`, see Dependency Management above for why static rather than shared)
-- **Deno**: Latest release from denoland/deno (Windows: `x86_64-pc-windows-msvc`; Linux: `x86_64-unknown-linux-gnu`/`aarch64-unknown-linux-gnu`)
-- **Runtime Detection**: Checks for a system Deno/Node install in PATH using `where deno` (Windows) or `which deno` (Linux)
+- **yt-dlp**: Always latest from GitHub releases (Windows: `yt-dlp.exe`; Linux: `yt-dlp_linux`/`yt-dlp_linux_aarch64`; macOS: `yt-dlp_macos`, a single `universal2` binary for both architectures)
+- **FFmpeg**: Windows/Linux - latest autobuild from BtbN/FFmpeg-Builds (Windows: `win64-gpl-shared`; Linux: static `gpl` build - `linux64-gpl.tar.xz`/`linuxarm64-gpl.tar.xz`, see Dependency Management above for why static rather than shared). macOS - latest release from `eugeneware/ffmpeg-static` (BtbN does not publish macOS builds): loose binaries `ffmpeg-darwin-x64`/`ffmpeg-darwin-arm64` and `ffprobe-darwin-x64`/`ffprobe-darwin-arm64`, downloaded directly with no archive/extraction step
+- **Deno**: Latest release from denoland/deno (Windows: `x86_64-pc-windows-msvc`; Linux: `x86_64-unknown-linux-gnu`/`aarch64-unknown-linux-gnu`; macOS: `x86_64-apple-darwin`/`aarch64-apple-darwin`)
+- **Runtime Detection**: Checks for a system Deno/Node install in PATH using `where deno` (Windows) or `which deno` (Linux/macOS)
 
 ### yt-dlp Integration
 The application passes specific arguments based on user selections:
@@ -457,8 +476,10 @@ Before committing changes, verify:
   - License: Unlicense
 
 - **FFmpeg**: Audio/video processing
-  - Source: https://github.com/BtbN/FFmpeg-Builds
-  - License: GPL (Windows: `gpl-shared` build; Linux: static `gpl` build - see Dependency Management above)
+  - Source (Windows/Linux): https://github.com/BtbN/FFmpeg-Builds
+    - License: GPL (Windows: `gpl-shared` build; Linux: static `gpl` build - see Dependency Management above)
+  - Source (macOS): https://github.com/eugeneware/ffmpeg-static
+    - License: GPL (BtbN does not publish macOS builds; this is a separately-maintained project also used as the `ffmpeg-static` npm package)
 
 - **Deno**: JavaScript/TypeScript runtime for yt-dlp
   - Source: https://github.com/denoland/deno
@@ -472,6 +493,10 @@ Three pinned Avalonia 12.1.2 packages (see `YouTubeDownloader.csproj`):
 - `Avalonia.Themes.Fluent` (12.1.2) - the `FluentTheme` registered in `App.axaml`
 
 Future dependency/CVE audits must cover these NuGet packages in addition to the external yt-dlp/FFmpeg/Deno binaries listed above.
+
+## macOS Gatekeeper Notice
+
+The macOS builds of this application are **not code-signed or notarized** (that requires a paid Apple Developer Program account, which this project does not currently have). On first launch, macOS Gatekeeper will refuse to open the downloaded binary with a warning that it is "from an unidentified developer" or "cannot be verified." Users must explicitly allow it once: either right-click (or Control-click) the app and choose "Open" from the context menu (this shows an "Open anyway" option Gatekeeper doesn't offer on a plain double-click), or clear the quarantine attribute from a terminal: `xattr -d com.apple.quarantine <path-to-binary>`. This is a one-time step per download; it does not need to be repeated on subsequent launches of the same binary.
 
 ## Useful References
 
@@ -502,10 +527,9 @@ This project follows standard Git practices:
 8. **Portable Mode**: Config file for portable installations
 9. **Update Notifications**: Check for application updates
 10. **Subtitle Download**: Option to download subtitles/captions
-11. **macOS Support**: Extend the OS-conditional dependency logic (see Dependency Management) to macOS - needs a different FFmpeg source since BtbN/FFmpeg-Builds doesn't publish macOS builds, plus new RIDs (`osx-x64`/`osx-arm64`) and a macOS CI runner
 
 ---
 
 **Last Updated**: 2026-09-10
 **For**: AI Assistants (Claude, etc.)
-**Project**: YouTube Downloader for Windows and Linux (.NET 10)
+**Project**: YouTube Downloader for Windows, Linux, and macOS (.NET 10)
