@@ -5,6 +5,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -226,6 +227,15 @@ public partial class MainWindow : Window
         return "";
     }
 
+    private static string GetDenoAssetName()
+    {
+        if (OperatingSystem.IsWindows())
+            return "deno-x86_64-pc-windows-msvc.zip";
+
+        bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+        return isArm ? "deno-aarch64-unknown-linux-gnu.zip" : "deno-x86_64-unknown-linux-gnu.zip";
+    }
+
     private async Task<(string downloadUrl, string version)> GetLatestDenoInfo()
     {
         try
@@ -238,13 +248,14 @@ public partial class MainWindow : Window
             var root = jsonDoc.RootElement;
 
             string version = root.GetProperty("tag_name").GetString() ?? "";
+            string assetName = GetDenoAssetName();
 
             string downloadUrl = "";
             var assets = root.GetProperty("assets");
             foreach (var asset in assets.EnumerateArray())
             {
                 string name = asset.GetProperty("name").GetString() ?? "";
-                if (name.Contains("deno-x86_64-pc-windows-msvc.zip"))
+                if (name.Contains(assetName))
                 {
                     downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
                     break;
@@ -270,7 +281,7 @@ public partial class MainWindow : Window
 
             if (string.IsNullOrEmpty(downloadUrl))
             {
-                await MessageDialog.ShowAsync(this, "Nie znaleziono Deno dla Windows", "Blad");
+                await MessageDialog.ShowAsync(this, "Nie znaleziono Deno dla tego systemu", "Blad");
                 return;
             }
 
@@ -279,14 +290,17 @@ public partial class MainWindow : Window
 
             UpdateStatus("Rozpakowywanie Deno...");
 
+            string denoEntryName = OperatingSystem.IsWindows() ? "deno.exe" : "deno";
             using (ZipArchive archive = ZipFile.OpenRead(zipPath))
             {
-                var denoEntry = archive.GetEntry("deno.exe");
+                var denoEntry = archive.GetEntry(denoEntryName);
                 if (denoEntry != null)
                     denoEntry.ExtractToFile(denoPath, true);
             }
 
             File.Delete(zipPath);
+
+            MakeExecutable(denoPath);
 
             if (!string.IsNullOrEmpty(version))
                 await File.WriteAllTextAsync(denoVersionPath, version);
@@ -300,12 +314,22 @@ public partial class MainWindow : Window
         }
     }
 
+    private static string GetYtDlpAssetName()
+    {
+        if (OperatingSystem.IsWindows())
+            return "yt-dlp.exe";
+
+        bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
+        return isArm ? "yt-dlp_linux_aarch64" : "yt-dlp_linux";
+    }
+
     private async Task DownloadYtDlp()
     {
         try
         {
-            string url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
+            string url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/" + GetYtDlpAssetName();
             await DownloadFileWithProgress(url, ytDlpPath);
+            MakeExecutable(ytDlpPath);
             UpdateStatus("yt-dlp pobrane");
         }
         catch (Exception ex)
