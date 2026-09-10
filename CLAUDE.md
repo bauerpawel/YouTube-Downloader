@@ -101,8 +101,10 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - Downloads yt-dlp if missing, FFmpeg if missing
 - All operations are async and report progress via `UpdateStatus()`
 
-**IsRuntimeInPath() / CheckAndUpdateDeno()'s "is a system runtime installed" check**
-- Shells out to `where deno` on Windows, `which deno` on Linux (`OperatingSystem.IsWindows() ? "where" : "which"`) to detect a system-wide Deno/Node install
+**IsRuntimeInPath() / GetRuntimePath() / CheckAndUpdateDeno()'s "system runtime" check - three distinct mechanisms, not one**
+- `IsRuntimeInPath()` (called from `CheckAndDownloadComponents()`, to decide whether Deno needs to be auto-downloaded on first run) is the one that actually shells out: `where deno` on Windows, `which deno` on Linux (`OperatingSystem.IsWindows() ? "where" : "which"`), treating a zero exit code as "a system-wide Deno is available"
+- `GetRuntimePath()` (used to build the yt-dlp `--js-runtimes` invocation) first checks `File.Exists()` for the app-managed `denoPath`/`nodeJsPath`, and only falls back to the same `where`/`which` shell-out - returning its stdout as the runtime path - if neither local binary exists
+- `CheckAndUpdateDeno()` (used by the "Update Components" menu action) does **not** shell out at all: it only checks `File.Exists(denoPath)` as a local proxy - if the app's own managed `deno` binary isn't present, it assumes a system/external runtime is in use and skips the version-check/update entirely, without querying `where`/`which` itself
 
 **GetDenoAssetName() / DownloadDeno() / GetLatestDenoInfo()**
 - Queries the GitHub API for the latest Deno release, picks the matching asset by name via `GetDenoAssetName()`:
@@ -499,6 +501,7 @@ This project follows standard Git practices:
 8. **Portable Mode**: Config file for portable installations
 9. **Update Notifications**: Check for application updates
 10. **Subtitle Download**: Option to download subtitles/captions
+11. **macOS Support**: Extend the OS-conditional dependency logic (see Dependency Management) to macOS - needs a different FFmpeg source since BtbN/FFmpeg-Builds doesn't publish macOS builds, plus new RIDs (`osx-x64`/`osx-arm64`) and a macOS CI runner
 
 ---
 
