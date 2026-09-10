@@ -63,7 +63,13 @@ public partial class MainWindow : Window
         MiAktualizujKomponenty.Click += async (s, e) => await AktualizujKomponenty_Click();
         MiInformacje.Click += async (s, e) => await Informacje_Click();
 
-        CheckAndDownloadComponents();
+        Opened += (s, e) => CheckAndDownloadComponents();
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        httpClient.Dispose();
+        base.OnClosed(e);
     }
 
     private void ContentType_Changed(object? sender, SelectionChangedEventArgs e)

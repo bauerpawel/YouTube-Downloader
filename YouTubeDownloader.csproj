@@ -23,4 +23,10 @@
     <AvaloniaResource Include="Assets\app-logo.png" />
   </ItemGroup>
 
+  <Target Name="StripNativePdbs" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb'" />
+    </ItemGroup>
+  </Target>
+
 </Project>

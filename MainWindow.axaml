@@ -49,7 +49,7 @@
 
       <Border BorderBrush="Gray" BorderThickness="1" Height="250">
         <TextBlock Name="LblStatus" Text="Gotowy do pobierania"
-                    FontFamily="Courier New" Padding="5" TextWrapping="Wrap"/>
+                    FontFamily="Courier New, monospace" Padding="5" TextWrapping="Wrap"/>
       </Border>
     </StackPanel>
   </DockPanel>
