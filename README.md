@@ -23,7 +23,7 @@
 
 ### 📝 Opis
 
-YouTube Downloader to aplikacja desktopowa dla systemu Windows, zbudowana w .NET 10 i Windows Forms, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
+YouTube Downloader to aplikacja desktopowa dla systemu Windows, zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
 
 ### ✨ Funkcje
 
@@ -105,6 +105,11 @@ dotnet run
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
+Dla komputerów z procesorem ARM (np. Windows on ARM) zamień `win-x64` na `win-arm64`:
+```bash
+dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true
+```
+
 **Framework-dependent:**
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained false
@@ -112,8 +117,9 @@ dotnet publish -c Release -r win-x64 --self-contained false
 
 Plik wykonywalny zostanie utworzony w:
 ```
-bin/Release/net10.0-windows/win-x64/publish/
+bin/Release/net10.0/win-x64/publish/
 ```
+(dla `win-arm64` odpowiednio w `bin/Release/net10.0/win-arm64/publish/`)
 
 ### 🚀 Użytkowanie
 
@@ -129,15 +135,29 @@ bin/Release/net10.0-windows/win-x64/publish/
 
 ```
 YouTube-Downloader/
-├── MainForm.cs                 # Główna aplikacja - Windows Form z całą logiką
-├── YouTubeDownloader.csproj    # Konfiguracja projektu .NET 10
-├── logo.svg                    # Logo aplikacji
-├── README.md                   # Dokumentacja projektu
-├── CLAUDE.md                   # Przewodnik dla asystentów AI
-├── LICENSE                     # Licencja Apache 2.0
+├── Program.cs                   # Punkt wejścia aplikacji (Avalonia AppBuilder, STAThread)
+├── App.axaml                    # XAML na poziomie aplikacji (rejestruje FluentTheme)
+├── App.axaml.cs                 # Logika startowa - tworzy i pokazuje MainWindow
+├── MainWindow.axaml             # Układ UI głównego okna (XAML)
+├── MainWindow.axaml.cs          # Logika głównego okna - zarządzanie zależnościami, pobieranie,
+│                                 # obsługa URL, mechanizm aktualizacji (cała logika biznesowa)
+├── AboutWindow.axaml            # Układ UI okna "Informacje" (XAML)
+├── AboutWindow.axaml.cs         # Logika okna "Informacje" - linki do repo/autora
+├── MessageDialog.axaml          # Układ UI okna komunikatów/potwierdzeń wielokrotnego użytku (XAML)
+├── MessageDialog.axaml.cs       # Logika okna komunikatów/potwierdzeń wielokrotnego użytku
+│                                 # (zastępuje WinForms MessageBox)
+├── Assets/
+│   └── app-logo.png             # Logo aplikacji, widoczne w oknie Informacje i oknach komunikatów
+├── YouTubeDownloader.csproj     # Konfiguracja projektu .NET 10 (pakiety Avalonia)
+├── app.ico                      # Ikona aplikacji/okna
+├── logo.svg                     # Źródłowe logo aplikacji (SVG)
+├── build.bat                    # Owija `dotnet publish` dla win-x64/win-arm64
+├── README.md                    # Dokumentacja projektu
+├── LICENSE                      # Licencja Apache 2.0
+├── CLAUDE.md                    # Przewodnik dla asystentów AI
 └── .github/
     └── workflows/
-        └── dotnet-desktop.yml  # GitHub Actions CI/CD
+        └── dotnet-desktop.yml   # GitHub Actions CI/CD
 ```
 
 ### 🔧 Zależności runtime (pobierane automatycznie)
@@ -160,7 +180,7 @@ Zgłoszenia błędów i pull requesty są mile widziane na GitHub.
 
 ### 📝 Description
 
-YouTube Downloader is a Windows desktop application built with .NET 10 and Windows Forms that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
+YouTube Downloader is a Windows desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
 
 ### ✨ Features
 
@@ -242,6 +262,11 @@ dotnet run
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
+For ARM-based PCs (e.g. Windows on ARM), swap `win-x64` for `win-arm64`:
+```bash
+dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true
+```
+
 **Framework-dependent:**
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained false
@@ -249,8 +274,9 @@ dotnet publish -c Release -r win-x64 --self-contained false
 
 The executable will be created in:
 ```
-bin/Release/net10.0-windows/win-x64/publish/
+bin/Release/net10.0/win-x64/publish/
 ```
+(for `win-arm64`, respectively in `bin/Release/net10.0/win-arm64/publish/`)
 
 ### 🚀 Usage
 
@@ -266,15 +292,29 @@ bin/Release/net10.0-windows/win-x64/publish/
 
 ```
 YouTube-Downloader/
-├── MainForm.cs                 # Main application - Windows Form with all logic
-├── YouTubeDownloader.csproj    # .NET 10 project configuration
-├── logo.svg                    # Application logo
-├── README.md                   # Project documentation
-├── CLAUDE.md                   # AI assistant guide
-├── LICENSE                     # Apache 2.0 license
+├── Program.cs                   # Application entry point (Avalonia AppBuilder, STAThread)
+├── App.axaml                    # Application-level XAML (registers FluentTheme)
+├── App.axaml.cs                 # Startup logic - creates and shows MainWindow
+├── MainWindow.axaml             # Main window UI layout (XAML)
+├── MainWindow.axaml.cs          # Main window logic - dependency management, download
+│                                 # orchestration, URL handling, update mechanism (all business logic)
+├── AboutWindow.axaml            # "About" dialog UI layout (XAML)
+├── AboutWindow.axaml.cs         # "About" dialog logic - repo/author links
+├── MessageDialog.axaml          # Reusable message/confirmation dialog UI layout (XAML)
+├── MessageDialog.axaml.cs       # Reusable message/confirmation dialog logic
+│                                 # (replaces WinForms MessageBox)
+├── Assets/
+│   └── app-logo.png             # Application logo, shown in About and message dialogs
+├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
+├── app.ico                      # Application/window icon
+├── logo.svg                     # Source application logo (SVG)
+├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64
+├── README.md                    # Project documentation
+├── LICENSE                      # Apache 2.0 license
+├── CLAUDE.md                    # AI assistant guide
 └── .github/
     └── workflows/
-        └── dotnet-desktop.yml  # GitHub Actions CI/CD
+        └── dotnet-desktop.yml   # GitHub Actions CI/CD
 ```
 
 ### 🔧 Runtime dependencies (downloaded automatically)

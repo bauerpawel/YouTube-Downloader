@@ -1,0 +1,21 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="YouTubeDownloader.MessageDialog"
+        Width="380" SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner"
+        Icon="/app.ico">
+  <StackPanel Margin="20" Spacing="15">
+    <StackPanel Orientation="Horizontal" Spacing="15">
+      <Image Source="/Assets/app-logo.png" Width="32" Height="32" VerticalAlignment="Top"/>
+      <ScrollViewer MaxHeight="300" HorizontalScrollBarVisibility="Disabled">
+        <TextBlock Name="MessageText" TextWrapping="Wrap" MaxWidth="290"/>
+      </ScrollViewer>
+    </StackPanel>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+      <Button Name="OkButton" Content="OK" Width="80"/>
+      <Button Name="CancelButton" Content="Nie" Width="80" IsVisible="False"/>
+    </StackPanel>
+  </StackPanel>
+</Window>

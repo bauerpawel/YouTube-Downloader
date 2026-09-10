@@ -15,7 +15,17 @@ if errorlevel 1 (
 )
 
 set PROJECT=YouTubeDownloader.csproj
-set OUTPUT=publish
+
+set RID=%1
+if "%RID%"=="" set RID=win-x64
+if /i not "%RID%"=="win-x64" if /i not "%RID%"=="win-arm64" (
+    echo [BLAD] Nieznana architektura "%RID%". Uzyj win-x64 lub win-arm64.
+    echo Przyklad: build.bat win-arm64
+    pause
+    exit /b 1
+)
+
+set OUTPUT=publish\%RID%
 
 if exist "%OUTPUT%" (
     echo Czyszczenie poprzedniego katalogu %OUTPUT%...
@@ -32,10 +42,10 @@ if errorlevel 1 (
 )
 
 echo.
-echo Budowanie pojedynczego pliku EXE (self-contained, win-x64)...
+echo Budowanie pojedynczego pliku EXE (self-contained, %RID%)...
 dotnet publish "%PROJECT%" ^
     -c Release ^
-    -r win-x64 ^
+    -r %RID% ^
     --self-contained true ^
     -p:PublishSingleFile=true ^
     -p:IncludeNativeLibrariesForSelfExtract=true ^
@@ -53,5 +63,7 @@ echo ============================================
 echo   Gotowe! Plik wykonywalny znajduje sie w:
 echo   %CD%\%OUTPUT%\YouTubeDownloader.exe
 echo ============================================
+echo.
+echo Wskazowka: aby zbudowac dla ARM64, uruchom: build.bat win-arm64
 echo.
 pause
