@@ -16,13 +16,18 @@ on:
 env:
   Solution_Name: YouTubeDownloader.csproj
 
+defaults:
+  run:
+    shell: pwsh
+
 jobs:
   build:
     strategy:
       matrix:
         configuration: [Debug, Release]
+        os: [windows-latest, ubuntu-latest]
 
-    runs-on: windows-latest  # Windows required for this phase (Avalonia UI, Windows-only for now)
+    runs-on: ${{ matrix.os }}
 
     steps:
     - name: Checkout
@@ -54,11 +59,27 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # not on forked PRs
 
     strategy:
-      max-parallel: 1  # avoid racing when both RIDs update the same GitHub Release
+      max-parallel: 1  # avoid racing when RIDs update the same GitHub Release
       matrix:
-        rid: [win-x64, win-arm64]
+        include:
+          - rid: win-x64
+            os: windows-latest
+            exeName: YouTubeDownloader.exe
+            releaseExeName: YouTubeDownloader-win-x64.exe
+          - rid: win-arm64
+            os: windows-latest
+            exeName: YouTubeDownloader.exe
+            releaseExeName: YouTubeDownloader-win-arm64.exe
+          - rid: linux-x64
+            os: ubuntu-latest
+            exeName: YouTubeDownloader
+            releaseExeName: YouTubeDownloader-linux-x64
+          - rid: linux-arm64
+            os: ubuntu-latest
+            exeName: YouTubeDownloader
+            releaseExeName: YouTubeDownloader-linux-arm64
 
-    runs-on: windows-latest  # Windows required for this phase (Avalonia UI, Windows-only for now)
+    runs-on: ${{ matrix.os }}
 
     steps:
     - name: Checkout
@@ -88,20 +109,45 @@ jobs:
           -p:EnableCompressionInSingleFile=true `
           -o ./publish/${{ matrix.rid }}
 
+    # ZIP/copy steps below don't reliably preserve the Unix executable bit across
+    # platforms, so the binary is (re-)marked executable at each point it's used.
+    - name: Mark binary executable (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: chmod +x ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
+
+    # Headless smoke-test: the only real proof (in this whole project) that the
+    # Linux build actually starts, since local development happens on Windows.
+    - name: Smoke-test published binary (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update && sudo apt-get install -y xvfb
+        xvfb-run --auto-servernum ./publish/${{ matrix.rid }}/${{ matrix.exeName }} &
+        APP_PID=$!
+        sleep 5
+        if kill -0 $APP_PID 2>/dev/null; then
+          echo "App is running (PID $APP_PID)"
+          kill $APP_PID
+        else
+          echo "App failed to start or crashed"
+          exit 1
+        fi
+
     # Package publish folder - create zip of the publish folder
     - name: Package publish folder
       run: Compress-Archive -Path ./publish/${{ matrix.rid }}/* -DestinationPath ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip -Force
 
     # Verify publish output
     - name: Verify publish output
-      run: dir ./publish/${{ matrix.rid }} || ls -la ./publish/${{ matrix.rid }}
+      run: dir ./publish/${{ matrix.rid }}
 
     # Upload build artifacts
     - name: Upload Release Artifacts
       uses: actions/upload-artifact@v7
       with:
         name: YouTubeDownloader-${{ matrix.rid }}
-        path: ./publish/${{ matrix.rid }}/YouTubeDownloader.exe
+        path: ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
         if-no-files-found: error
 
     # Upload all published files as artifact
@@ -115,7 +161,12 @@ jobs:
     # GitHub release assets must have unique file names across the whole release,
     # so give the per-RID exe a distinct name before attaching it.
     - name: Prepare release asset names
-      run: Copy-Item ./publish/${{ matrix.rid }}/YouTubeDownloader.exe ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.exe
+      run: Copy-Item ./publish/${{ matrix.rid }}/${{ matrix.exeName }} ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
+
+    - name: Mark release asset executable (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: chmod +x ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
 
     # Create/update a GitHub Release and upload the exe and zip as release assets
     # Note: actions/create-release and actions/upload-release-asset are archived/unmaintained,
@@ -131,5 +182,5 @@ jobs:
         draft: false
         prerelease: false
         files: |
-          ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.exe
+          ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
           ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
