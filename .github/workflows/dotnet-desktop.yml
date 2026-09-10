@@ -117,22 +117,45 @@ jobs:
       run: chmod +x ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
 
     # Headless smoke-test: the only real proof (in this whole project) that the
-    # Linux build actually starts, since local development happens on Windows.
-    - name: Smoke-test published binary (Linux)
-      if: runner.os == 'Linux'
+    # Linux dependency-download logic (Tasks 1-3) actually works, since local
+    # development happens on Windows. linux-x64 only: ubuntu-latest is an x86-64
+    # runner and cannot execute an aarch64 binary without QEMU/binfmt_misc
+    # registration, which this workflow does not set up. Runs against a copy in
+    # an isolated temp directory (not ./publish/<rid>/), since the app downloads
+    # its own dependencies on startup and that directory gets zipped/uploaded as
+    # the release artifact.
+    - name: Smoke-test published binary (linux-x64 only)
+      if: matrix.rid == 'linux-x64'
       shell: bash
       run: |
-        sudo apt-get update && sudo apt-get install -y xvfb
-        xvfb-run --auto-servernum ./publish/${{ matrix.rid }}/${{ matrix.exeName }} &
+        sudo apt-get update
+        sudo apt-get install -y xvfb libx11-6 libice6 libsm6 fontconfig fonts-dejavu-core
+        SMOKE="$RUNNER_TEMP/smoke"
+        mkdir -p "$SMOKE"
+        cp ./publish/${{ matrix.rid }}/${{ matrix.exeName }} "$SMOKE/"
+        chmod +x "$SMOKE/${{ matrix.exeName }}"
+        xvfb-run --auto-servernum "$SMOKE/${{ matrix.exeName }}" > "$SMOKE/app.log" 2>&1 &
         APP_PID=$!
-        sleep 5
+        sleep 60
         if kill -0 $APP_PID 2>/dev/null; then
-          echo "App is running (PID $APP_PID)"
-          kill $APP_PID
+          echo "App is running (PID $APP_PID) after 60s"
         else
           echo "App failed to start or crashed"
+          cat "$SMOKE/app.log"
           exit 1
         fi
+        if [ -x "$SMOKE/yt-dlp" ] && [ -x "$SMOKE/ffmpeg_bin/ffmpeg" ]; then
+          echo "yt-dlp and ffmpeg were downloaded and are executable - Linux dependency logic verified"
+        else
+          echo "App is running, but yt-dlp/ffmpeg were not downloaded/executable as expected"
+          ls -la "$SMOKE" "$SMOKE/ffmpeg_bin" 2>&1
+          cat "$SMOKE/app.log"
+          pkill -f "$SMOKE/${{ matrix.exeName }}" || true
+          exit 1
+        fi
+        pkill -f "$SMOKE/${{ matrix.exeName }}" || true
+        kill $APP_PID 2>/dev/null || true
+        rm -rf "$SMOKE"
 
     # Package publish folder - create zip of the publish folder
     - name: Package publish folder

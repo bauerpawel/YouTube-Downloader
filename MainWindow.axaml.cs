@@ -232,6 +232,9 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsWindows())
             return "deno-x86_64-pc-windows-msvc.zip";
 
+        if (!OperatingSystem.IsLinux())
+            throw new PlatformNotSupportedException("Deno auto-download is only supported on Windows and Linux.");
+
         bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
         return isArm ? "deno-aarch64-unknown-linux-gnu.zip" : "deno-x86_64-unknown-linux-gnu.zip";
     }
@@ -319,6 +322,9 @@ public partial class MainWindow : Window
         if (OperatingSystem.IsWindows())
             return "yt-dlp.exe";
 
+        if (!OperatingSystem.IsLinux())
+            throw new PlatformNotSupportedException("yt-dlp auto-download is only supported on Windows and Linux.");
+
         bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
         return isArm ? "yt-dlp_linux_aarch64" : "yt-dlp_linux";
     }
@@ -342,6 +348,9 @@ public partial class MainWindow : Window
     {
         if (OperatingSystem.IsWindows())
             return assetName.Contains("win64-gpl-shared") && assetName.EndsWith(".zip");
+
+        if (!OperatingSystem.IsLinux())
+            throw new PlatformNotSupportedException("FFmpeg auto-download is only supported on Windows and Linux.");
 
         bool isArm = RuntimeInformation.ProcessArchitecture == Architecture.Arm64;
         string suffix = isArm ? "linuxarm64-gpl.tar.xz" : "linux64-gpl.tar.xz";

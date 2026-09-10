@@ -50,13 +50,14 @@ Application Directory/
 ├── ffmpeg_bin/                 # FFmpeg binaries directory
 │   ├── ffmpeg.exe
 │   ├── ffprobe.exe
+│   ├── ffplay.exe
 │   └── *.dll                   # FFmpeg shared libraries (win64-gpl-shared build)
 ├── ffmpeg_version.txt          # Tracks current FFmpeg version
 └── downloads/                  # Default download location
     └── (downloaded videos)
 ```
 
-On Linux, the layout is identical but every binary lacks the `.exe` extension (`yt-dlp`, `deno`, `node`), and `ffmpeg_bin/` holds only `ffmpeg`/`ffprobe` - no `*.so` companions, because the Linux download is the **static** FFmpeg build rather than `-shared` (see Dependency Management below for why). All downloaded/extracted binaries are marked executable via `MakeExecutable()` since neither the raw HTTP download nor `tar`/`ZipFile` extraction preserves the Unix executable bit.
+On Linux, the layout is identical but every binary lacks the `.exe` extension (`yt-dlp`, `deno`, `node`), and `ffmpeg_bin/` holds `ffmpeg`/`ffprobe`/`ffplay` - no `*.so` companions, because the Linux download is the **static** FFmpeg build rather than `-shared` (see Dependency Management below for why). All downloaded/extracted binaries are marked executable via `MakeExecutable()` - strictly required for the raw HTTP download (yt-dlp has no archive to carry a Unix mode), and applied defensively after `tar`/`ZipFile` extraction too, since archive-recorded permissions can't always be relied on.
 
 ## Codebase Architecture
 

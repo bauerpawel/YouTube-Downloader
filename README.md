@@ -6,7 +6,7 @@
 
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)
-![Platform](https://img.shields.io/badge/Platform-Windows-0078D6?logo=windows)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-0078D6?logo=windows)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)
 
 **Aplikacja desktopowa do pobierania wideo i audio z YouTube**
@@ -23,7 +23,7 @@
 
 ### 📝 Opis
 
-YouTube Downloader to aplikacja desktopowa dla systemu Windows, zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
+YouTube Downloader to aplikacja desktopowa na Windows i Linux (x64/ARM64), zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
 
 ### ✨ Funkcje
 
@@ -180,7 +180,7 @@ Zgłoszenia błędów i pull requesty są mile widziane na GitHub.
 
 ### 📝 Description
 
-YouTube Downloader is a Windows desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
+YouTube Downloader is a Windows and Linux desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
 
 ### ✨ Features
 
