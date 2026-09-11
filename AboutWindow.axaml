@@ -9,7 +9,7 @@
   <StackPanel Margin="20" Spacing="10" HorizontalAlignment="Center">
     <Image Source="/Assets/app-logo.png" Width="64" Height="64" HorizontalAlignment="Center"/>
     <TextBlock Text="YouTube Downloader" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center"/>
-    <TextBlock Text="Wersja 2.0.0" HorizontalAlignment="Center"/>
+    <TextBlock Name="VersionText" Text="Wersja 2.0.0" HorizontalAlignment="Center"/>
     <TextBlock Text="Licencja: Apache License 2.0" HorizontalAlignment="Center"/>
 
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">

@@ -101,6 +101,16 @@ jobs:
       with:
         dotnet-version: 10.0.x
 
+    # Read the app version from the csproj (single source of truth), so the
+    # release tag/name reflect the actual app version instead of being
+    # version-blind. Suffixed with the run number (not just the version) so
+    # every push still gets its own distinct release, same as before.
+    - name: Get app version
+      id: get_version
+      run: |
+        $ver = dotnet msbuild $env:Solution_Name -getProperty:Version
+        echo "version=$ver" >> $env:GITHUB_OUTPUT
+
     # Restore dependencies
     - name: Restore dependencies
       run: dotnet restore $env:Solution_Name
@@ -254,9 +264,9 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
-        tag_name: v${{ github.run_number }}-${{ github.sha }}
-        name: Automated Release ${{ github.run_number }}
-        body: Automated release for run ${{ github.run_id }} (commit ${{ github.sha }})
+        tag_name: v${{ steps.get_version.outputs.version }}-${{ github.run_number }}
+        name: v${{ steps.get_version.outputs.version }} (build ${{ github.run_number }})
+        body: Automated release for version ${{ steps.get_version.outputs.version }}, run ${{ github.run_id }} (commit ${{ github.sha }})
         draft: false
         prerelease: false
         files: |

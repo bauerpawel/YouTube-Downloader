@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Reflection;
 using System.Threading.Tasks;
 using Avalonia.Controls;
 
@@ -11,9 +12,18 @@ public partial class AboutWindow : Window
     {
         InitializeComponent();
 
+        VersionText.Text = "Wersja " + GetAppVersion();
+
         RepoLink.PointerPressed += async (s, e) => await OpenUrl("https://github.com/bauerpawel/YouTube-Downloader");
         AuthorLink.PointerPressed += async (s, e) => await OpenUrl("https://bauer.net.pl");
         CloseButton.Click += (s, e) => Close();
+    }
+
+    private static string GetAppVersion()
+    {
+        return Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? "?";
     }
 
     private async Task OpenUrl(string url)

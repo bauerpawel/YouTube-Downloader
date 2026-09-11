@@ -499,6 +499,10 @@ Three pinned Avalonia 12.1.2 packages (see `YouTubeDownloader.csproj`):
 
 Future dependency/CVE audits must cover these NuGet packages in addition to the external yt-dlp/FFmpeg/Deno binaries listed above.
 
+### App Version
+
+`<Version>` in `YouTubeDownloader.csproj` is the single source of truth for the app's version number (format: `Major.Minor.<ddMMyy>`, e.g. `2.0.110926` for 2026-09-11 - a date-based build number, not semantic versioning). `AssemblyVersion`/`FileVersion` are pinned separately to `2.0.0.0` in the same file, since .NET requires each of their four components to fit in 16 bits (max 65535) and a `ddMMyy` build number regularly exceeds that - only `AssemblyInformationalVersionAttribute` (populated from `<Version>` with no such limit) can hold the full date-based string. `AboutWindow.axaml.cs`'s `GetAppVersion()` reads that attribute via reflection at runtime, so the About dialog always matches `<Version>` without a second manual edit. CI's `publish` job reads the same property (`dotnet msbuild ... -getProperty:Version`) to name the GitHub Release (`v<version>-<run_number>`) - bump `<Version>` here and every consumer (About dialog, release tag/name) picks it up automatically; `README.md`'s version badge and "What's New" section are the one place that still needs a manual edit per release, since they're prose, not something a build step can regenerate.
+
 ## macOS Gatekeeper Notice
 
 The macOS builds of this application are **not code-signed or notarized** (that requires a paid Apple Developer Program account, which this project does not currently have). On first launch, macOS Gatekeeper will refuse to open the downloaded binary with a warning that it is "from an unidentified developer" or "cannot be verified." Users must explicitly allow it once:
