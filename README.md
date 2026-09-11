@@ -39,8 +39,8 @@ YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64)
 ### 🛠️ Wymagania
 
 #### Do uruchomienia aplikacji:
-- **System operacyjny**: Windows 10 lub nowszy
-- **Architektura**: x64 (64-bit)
+- **System operacyjny**: Windows 10 lub nowszy, Linux (nowoczesna dystrybucja) lub macOS
+- **Architektura**: x64 lub ARM64 (64-bit)
 - **Połączenie internetowe**: Wymagane do pobierania filmów i zależności
 
 #### Do kompilacji:
@@ -110,6 +110,20 @@ Dla komputerów z procesorem ARM (np. Windows on ARM) zamień `win-x64` na `win-
 dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true
 ```
 
+Analogicznie dla Linuksa:
+```bash
+dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true
+```
+
+...i dla macOS:
+```bash
+dotnet publish -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true
+```
+
+Zamiast wywoływać `dotnet publish` ręcznie, można też użyć `build.bat` (Windows, domyślnie `win-x64`) lub `build.sh` (Linux/macOS, domyślnie `linux-x64`), np. `build.bat win-arm64` lub `./build.sh osx-arm64`.
+
 **Framework-dependent:**
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained false
@@ -119,7 +133,7 @@ Plik wykonywalny zostanie utworzony w:
 ```
 bin/Release/net10.0/win-x64/publish/
 ```
-(dla `win-arm64` odpowiednio w `bin/Release/net10.0/win-arm64/publish/`)
+(dla pozostałych RID-ów analogicznie, np. `bin/Release/net10.0/win-arm64/publish/`, `bin/Release/net10.0/linux-x64/publish/`, `bin/Release/net10.0/osx-arm64/publish/` itd.)
 
 ### 🚀 Użytkowanie
 
@@ -135,10 +149,10 @@ bin/Release/net10.0/win-x64/publish/
 
 Aplikacja nie jest podpisana ani notaryzowana (wymagałoby to płatnego konta Apple Developer Program, którego projekt obecnie nie posiada). Przy pierwszym uruchomieniu macOS Gatekeeper wyświetli ostrzeżenie, że aplikacja pochodzi od "niezidentyfikowanego dewelopera" lub "nie może zostać zweryfikowana". Aby ją uruchomić, wystarczy raz wykonać jedną z poniższych czynności:
 
-- Kliknij prawym przyciskiem myszy (lub Control+klik) na plik aplikacji i wybierz "Otwórz" z menu kontekstowego (pokaże to opcję "Otwórz mimo to", niedostępną przy zwykłym dwukliknięciu), albo
-- Usuń atrybut kwarantanny z terminala: `xattr -d com.apple.quarantine <ścieżka-do-pliku>`
+1. **Zalecane (działa na macOS 15 Sequoia i nowszych, a także na starszych wersjach)**: spróbuj otworzyć aplikację - zostanie zablokowana - a następnie przejdź do **Ustawienia systemowe -> Prywatność i bezpieczeństwo**, przewiń w dół do komunikatu o zablokowanej aplikacji i kliknij **"Otwórz mimo to"**. (Starszy sposób przez kliknięcie prawym przyciskiem/Control+klik -> "Otwórz" od macOS 15 Sequoia nie pokazuje już opcji "Otwórz mimo to".)
+2. **Alternatywa w terminalu**: usuń atrybut kwarantanny bezpośrednio: `xattr -d com.apple.quarantine <ścieżka-do-pliku>`
 
-Ten krok nie musi być powtarzany przy kolejnych uruchomieniach tego samego pliku.
+Ten krok nie musi być powtarzany przy kolejnych uruchomieniach tego samego pliku. Uwaga: paczka `.zip` z wydania (budowana w CI za pomocą `Compress-Archive`) nie zachowuje uniksowego bitu wykonywalności - po rozpakowaniu na macOS lub Linuksie należy najpierw nadać uprawnienie: `chmod +x <ścieżka-do-pliku>`, zanim aplikację da się w ogóle uruchomić (niezależnie od kroku z Gatekeeperem powyżej).
 
 ### 📂 Struktura projektu
 
@@ -208,8 +222,8 @@ YouTube Downloader is a Windows, Linux, and macOS desktop application built with
 ### 🛠️ Requirements
 
 #### To run the application:
-- **Operating System**: Windows 10 or newer
-- **Architecture**: x64 (64-bit)
+- **Operating System**: Windows 10 or newer, Linux (a modern distribution), or macOS
+- **Architecture**: x64 or ARM64 (64-bit)
 - **Internet connection**: Required for downloading videos and dependencies
 
 #### To compile:
@@ -279,6 +293,20 @@ For ARM-based PCs (e.g. Windows on ARM), swap `win-x64` for `win-arm64`:
 dotnet publish -c Release -r win-arm64 --self-contained true -p:PublishSingleFile=true
 ```
 
+Likewise for Linux:
+```bash
+dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish -c Release -r linux-arm64 --self-contained true -p:PublishSingleFile=true
+```
+
+...and for macOS:
+```bash
+dotnet publish -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true
+```
+
+Instead of calling `dotnet publish` directly, you can also use `build.bat` (Windows, defaults to `win-x64`) or `build.sh` (Linux/macOS, defaults to `linux-x64`), e.g. `build.bat win-arm64` or `./build.sh osx-arm64`.
+
 **Framework-dependent:**
 ```bash
 dotnet publish -c Release -r win-x64 --self-contained false
@@ -288,7 +316,7 @@ The executable will be created in:
 ```
 bin/Release/net10.0/win-x64/publish/
 ```
-(for `win-arm64`, respectively in `bin/Release/net10.0/win-arm64/publish/`)
+(for the other RIDs, respectively, e.g. `bin/Release/net10.0/win-arm64/publish/`, `bin/Release/net10.0/linux-x64/publish/`, `bin/Release/net10.0/osx-arm64/publish/`, etc.)
 
 ### 🚀 Usage
 
@@ -304,10 +332,10 @@ bin/Release/net10.0/win-x64/publish/
 
 The application is not code-signed or notarized (that requires a paid Apple Developer Program account, which this project does not currently have). On first launch, macOS Gatekeeper will refuse to open it with a warning that it is "from an unidentified developer" or "cannot be verified." You only need to do one of the following once:
 
-- Right-click (or Control-click) the app and choose "Open" from the context menu (this shows an "Open anyway" option Gatekeeper doesn't offer on a plain double-click), or
-- Clear the quarantine attribute from a terminal: `xattr -d com.apple.quarantine <path-to-binary>`
+1. **Recommended (works on macOS 15 Sequoia and later, and on older versions too)**: attempt to open the app - it will be blocked - then go to **System Settings -> Privacy & Security**, scroll down to the blocked-app notice, and click **"Open Anyway"**. (The older right-click/Control-click -> "Open" workaround no longer shows an "Open Anyway" option starting with macOS 15 Sequoia.)
+2. **Terminal alternative**: clear the quarantine attribute directly: `xattr -d com.apple.quarantine <path-to-binary>`
 
-This does not need to be repeated on subsequent launches of the same file.
+This does not need to be repeated on subsequent launches of the same file. Note: the release `.zip` asset (built via `Compress-Archive` in CI) does not preserve the Unix executable bit - after unzipping on macOS or Linux, you'll need to run `chmod +x <path-to-binary>` before the app can be launched at all, regardless of the Gatekeeper step above.
 
 ### 📂 Project Structure
 

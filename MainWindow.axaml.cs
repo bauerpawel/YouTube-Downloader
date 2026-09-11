@@ -351,6 +351,11 @@ public partial class MainWindow : Window
         }
     }
 
+    // macOS deliberately never reaches this method - it queries BtbN/FFmpeg-Builds, which only
+    // publishes Windows/Linux assets. macOS FFmpeg comes from GetLatestFFmpegInfoMac() instead;
+    // both callers of GetLatestFFmpegInfo() (this method's only caller) already branch away from
+    // macOS via OperatingSystem.IsMacOS() checks in DownloadFFmpeg() and CheckAndUpdateFFmpeg().
+    // Do not "fix" the exception message below to mention macOS - it would be inaccurate.
     private static bool IsMatchingFFmpegAsset(string assetName)
     {
         if (OperatingSystem.IsWindows())
@@ -582,6 +587,12 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
+            // Don't leave behind an empty/partial ffmpeg_bin/ - its mere existence is the
+            // app's only signal that FFmpeg is installed (see CheckAndDownloadComponents()),
+            // so a half-finished download here must not look like a successful install.
+            if (Directory.Exists(ffmpegBinPath))
+                Directory.Delete(ffmpegBinPath, true);
+
             await MessageDialog.ShowAsync(this, "Blad FFmpeg: " + ex.Message, "Blad");
             UpdateStatus("Blad: " + ex.Message);
         }

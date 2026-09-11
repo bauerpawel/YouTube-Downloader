@@ -105,7 +105,7 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - All operations are async and report progress via `UpdateStatus()`
 
 **IsRuntimeInPath() / GetRuntimePath() / CheckAndUpdateDeno()'s "system runtime" check - three distinct mechanisms, not one**
-- `IsRuntimeInPath()` (called from `CheckAndDownloadComponents()`, to decide whether Deno needs to be auto-downloaded on first run) is the one that actually shells out: `where deno` on Windows, `which deno` on Linux (`OperatingSystem.IsWindows() ? "where" : "which"`), treating a zero exit code as "a system-wide Deno is available"
+- `IsRuntimeInPath()` (called from `CheckAndDownloadComponents()`, to decide whether Deno needs to be auto-downloaded on first run) is the one that actually shells out: `where deno` on Windows, `which deno` on Linux/macOS (`OperatingSystem.IsWindows() ? "where" : "which"`), treating a zero exit code as "a system-wide Deno is available"
 - `GetRuntimePath()` (used to build the yt-dlp `--js-runtimes` invocation) first checks `File.Exists()` for the app-managed `denoPath`/`nodeJsPath`, and only falls back to the same `where`/`which` shell-out - returning its stdout as the runtime path - if neither local binary exists
 - `CheckAndUpdateDeno()` (used by the "Update Components" menu action) does **not** shell out at all: it only checks `File.Exists(denoPath)` as a local proxy - if the app's own managed `deno` binary isn't present, it assumes a system/external runtime is in use and skips the version-check/update entirely, without querying `where`/`which` itself
 
@@ -142,7 +142,7 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - `DownloadFFmpeg()` and `CheckAndUpdateFFmpeg()` both branch to this path via `OperatingSystem.IsMacOS()` before reaching any BtbN-specific code
 
 **MakeExecutable()**
-- No-op on Windows. On Linux, calls `File.SetUnixFileMode()` to set `rwxr-xr-x` (user read/write/execute, group/other read/execute) on the given path. Needed because neither a plain HTTP download nor `ZipFile`/`tar` extraction preserves (or sets) the Unix executable bit, so every downloaded yt-dlp/Deno/FFmpeg binary would otherwise be non-executable on first run
+- No-op on Windows. On Linux/macOS, calls `File.SetUnixFileMode()` to set `rwxr-xr-x` (user read/write/execute, group/other read/execute) on the given path. Needed because neither a plain HTTP download nor `ZipFile`/`tar` extraction preserves (or sets) the Unix executable bit, so every downloaded yt-dlp/Deno/FFmpeg binary would otherwise be non-executable on first run
 
 **DownloadFileWithProgress()**
 - Shared helper: streams an HTTP download to disk while reporting progress on `ProgressBarDownload`
@@ -450,7 +450,7 @@ using (var process = Process.Start(processInfo))
 
 ## Testing Checklist
 
-This project has no full GUI interaction test automation. There is no headless/CI-runnable UI interaction test suite, so verification of anything below beyond a clean build requires a manual smoke-launch and QA pass on Windows; on Linux, CI covers only a headless launch-only smoke-test (see Testing Changes above), so most items below are effectively Windows-verified only unless someone confirms them manually on Linux too.
+This project has no full GUI interaction test automation. There is no headless/CI-runnable UI interaction test suite, so verification of anything below beyond a clean build requires a manual smoke-launch and QA pass on Windows; on Linux, CI covers only a headless launch-only smoke-test (see Testing Changes above), so most items below are effectively Windows-verified only unless someone confirms them manually on Linux too. macOS has the same coverage shape as Linux - a CI-only launch-and-dependency-download smoke-test on `macos-latest`, not a manual interactive QA pass - so most items below are effectively Windows-verified only unless someone confirms them manually on macOS as well.
 
 Before committing changes, verify:
 - [ ] Application builds without warnings
@@ -496,7 +496,12 @@ Future dependency/CVE audits must cover these NuGet packages in addition to the 
 
 ## macOS Gatekeeper Notice
 
-The macOS builds of this application are **not code-signed or notarized** (that requires a paid Apple Developer Program account, which this project does not currently have). On first launch, macOS Gatekeeper will refuse to open the downloaded binary with a warning that it is "from an unidentified developer" or "cannot be verified." Users must explicitly allow it once: either right-click (or Control-click) the app and choose "Open" from the context menu (this shows an "Open anyway" option Gatekeeper doesn't offer on a plain double-click), or clear the quarantine attribute from a terminal: `xattr -d com.apple.quarantine <path-to-binary>`. This is a one-time step per download; it does not need to be repeated on subsequent launches of the same binary.
+The macOS builds of this application are **not code-signed or notarized** (that requires a paid Apple Developer Program account, which this project does not currently have). On first launch, macOS Gatekeeper will refuse to open the downloaded binary with a warning that it is "from an unidentified developer" or "cannot be verified." Users must explicitly allow it once:
+
+1. **Recommended (works on macOS 15 Sequoia and later, and on older versions too)**: attempt to open the app - it will be blocked - then go to **System Settings -> Privacy & Security**, scroll down to the blocked-app notice, and click **"Open Anyway"**. (The older right-click/Control-click -> "Open" workaround no longer shows an "Open anyway" option starting with macOS 15 Sequoia, since this project's CI already targets `macos-latest` - a Sequoia-class image - this is the method most readers will need.)
+2. **Terminal alternative**: clear the quarantine attribute directly: `xattr -d com.apple.quarantine <path-to-binary>`.
+
+This is a one-time step per download; it does not need to be repeated on subsequent launches of the same binary. Separately, note that the release `.zip` asset (built via `Compress-Archive` in CI) does not preserve the Unix executable bit - after unzipping on macOS or Linux, run `chmod +x <path-to-binary>` before the binary can be launched at all, regardless of the Gatekeeper step above.
 
 ## Useful References
 
