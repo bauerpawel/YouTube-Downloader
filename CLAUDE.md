@@ -246,6 +246,11 @@ dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFil
 
 # Or use build.sh, which wraps the above (defaults to linux-x64):
 ./build.sh osx-arm64
+
+# Build all six RIDs in one run (either script, both cross-compile every RID
+# from either OS): win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64
+build.bat all
+./build.sh all
 ```
 
 CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes all six RIDs - `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64` - on every push to `main`, running across `windows-latest`, `ubuntu-latest`, and `macos-latest` runners and attaching all six artifacts to the automated GitHub Release; the Linux jobs additionally run a headless launch smoke-test under `xvfb-run` (see Testing Changes below). The `macos-latest` runner is ARM64, so the `osx-x64` leg builds via cross-compilation and is smoke-tested there through Rosetta 2, which CI installs explicitly as its own step since it is not preinstalled on the runner image. Dependency downloads and runtime detection are now OS-conditional rather than Windows-only: Windows targets `yt-dlp.exe`/`deno.exe`/the `win64-gpl-shared` FFmpeg build and shells out to `where`; Linux targets the `yt-dlp_linux*`/`deno-*-unknown-linux-gnu.zip`/static-`gpl` FFmpeg assets and shells out to `which`; macOS targets `yt-dlp_macos`/`deno-*-apple-darwin.zip`/the `eugeneware/ffmpeg-static` binaries and also shells out to `which` (see Dependency Management above for the full OS split).
