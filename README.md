@@ -196,9 +196,9 @@ YouTube-Downloader/
 
 ### 🔧 Zależności runtime (pobierane automatycznie)
 
-- **yt-dlp** - Narzędzie do pobierania z YouTube
-- **FFmpeg** - Przetwarzanie audio/wideo (na macOS pobierane z `eugeneware/ffmpeg-static`, ponieważ BtbN/FFmpeg-Builds nie publikuje wersji dla macOS)
-- **Deno** - Runtime JavaScript/TypeScript dla yt-dlp (opcjonalnie Node.js)
+- **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** - Narzędzie do pobierania z YouTube
+- **[FFmpeg](https://ffmpeg.org/)** - Przetwarzanie audio/wideo (Windows/Linux: [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds); macOS: [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), ponieważ BtbN/FFmpeg-Builds nie publikuje wersji dla macOS)
+- **[Deno](https://deno.com/)** - Runtime JavaScript/TypeScript dla yt-dlp (opcjonalnie [Node.js](https://nodejs.org/))
 
 **Uwaga (macOS)**: binarki nie są podpisane - przy pierwszym uruchomieniu system pokaże ostrzeżenie Gatekeeper, patrz sekcja "Gatekeeper (macOS)" powyżej.
 
@@ -388,9 +388,9 @@ YouTube-Downloader/
 
 ### 🔧 Runtime dependencies (downloaded automatically)
 
-- **yt-dlp** - YouTube downloading tool
-- **FFmpeg** - Audio/video processing (on macOS, downloaded from `eugeneware/ffmpeg-static`, since BtbN/FFmpeg-Builds doesn't publish macOS builds)
-- **Deno** - JavaScript/TypeScript runtime for yt-dlp (alternatively Node.js)
+- **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** - YouTube downloading tool
+- **[FFmpeg](https://ffmpeg.org/)** - Audio/video processing (Windows/Linux: [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds); macOS: [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), since BtbN/FFmpeg-Builds doesn't publish macOS builds)
+- **[Deno](https://deno.com/)** - JavaScript/TypeScript runtime for yt-dlp (alternatively [Node.js](https://nodejs.org/))
 
 **Note (macOS)**: binaries are unsigned - on first launch macOS Gatekeeper will show a warning, see the "Gatekeeper (macOS)" section above.
 
