@@ -4,7 +4,7 @@
 
 <img src="logo.svg" alt="YouTube Downloader Logo" width="480"/>
 
-![Version](https://img.shields.io/badge/Version-2.0.0-brightgreen)
+![Version](https://img.shields.io/badge/Version-2.0.110926-brightgreen)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-0078D6?logo=windows)
@@ -26,7 +26,7 @@
 
 YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64), zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
 
-### 🆕 Co nowego w wersji 2.0.0
+### 🆕 Co nowego w wersji 2.0.110926
 
 - 🖥️ **Przeniesienie na Avalonia UI** - aplikacja przestała być zależna wyłącznie od Windows Forms, co otworzyło drogę do wsparcia innych systemów
 - 🍎🐧 **Wsparcie Linux i macOS** - obok Windows, teraz też natywne buildy na Linux i macOS, każdy w wariancie x64 i ARM64 (6 wariantów łącznie, budowane i testowane w CI)
@@ -218,7 +218,7 @@ Zgłoszenia błędów i pull requesty są mile widziane na GitHub.
 
 YouTube Downloader is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
 
-### 🆕 What's New in 2.0.0
+### 🆕 What's New in 2.0.110926
 
 - 🖥️ **Migrated to Avalonia UI** - the app is no longer tied exclusively to Windows Forms, opening the door to supporting other operating systems
 - 🍎🐧 **Linux and macOS support** - alongside Windows, now with native builds for Linux and macOS, each in x64 and ARM64 variants (6 variants total, built and tested in CI)
