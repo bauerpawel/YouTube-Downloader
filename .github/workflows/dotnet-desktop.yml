@@ -66,26 +66,33 @@ jobs:
             os: windows-latest
             exeName: YouTubeDownloader.exe
             releaseExeName: YouTubeDownloader-win-x64.exe
+            singleFile: true
           - rid: win-arm64
             os: windows-latest
             exeName: YouTubeDownloader.exe
             releaseExeName: YouTubeDownloader-win-arm64.exe
+            singleFile: true
           - rid: linux-x64
             os: ubuntu-latest
             exeName: YouTubeDownloader
             releaseExeName: YouTubeDownloader-linux-x64
+            singleFile: true
           - rid: linux-arm64
             os: ubuntu-latest
             exeName: YouTubeDownloader
             releaseExeName: YouTubeDownloader-linux-arm64
+            singleFile: true
+          # macOS does NOT use PublishSingleFile - see the "Publish
+          # Application" step's comment for why (a long-standing .NET
+          # runtime limitation, reproduced on this project's own CI).
           - rid: osx-x64
             os: macos-latest
             exeName: YouTubeDownloader
-            releaseExeName: YouTubeDownloader-osx-x64
+            singleFile: false
           - rid: osx-arm64
             os: macos-latest
             exeName: YouTubeDownloader
-            releaseExeName: YouTubeDownloader-osx-arm64
+            singleFile: false
 
     runs-on: ${{ matrix.os }}
 
@@ -115,16 +122,26 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore $env:Solution_Name
 
-    # Publish the self-contained single-file application for this architecture
+    # Publish the self-contained application for this architecture. Windows/
+    # Linux use PublishSingleFile (works reliably there); macOS does not -
+    # a long-standing, still-open .NET runtime limitation (dotnet/runtime
+    # #49091, #67062, #79267) means native libraries self-extracted from a
+    # single-file bundle at *runtime* are unsigned, and native Apple Silicon
+    # refuses to load unsigned code - reproduced on this exact CI three times
+    # in a row (ad-hoc-signing the single published file wasn't enough, since
+    # the native libraries it unpacks don't exist as files until runtime,
+    # after that signature was already applied). Publishing as a normal
+    # self-contained folder for macOS means every native library sits on
+    # disk from publish time onward, where the next step can sign it too.
     - name: Publish Application (${{ matrix.rid }})
       run: |
         dotnet publish $env:Solution_Name `
           -c Release `
           -r ${{ matrix.rid }} `
           --self-contained true `
-          -p:PublishSingleFile=true `
-          -p:IncludeNativeLibrariesForSelfExtract=true `
-          -p:EnableCompressionInSingleFile=true `
+          -p:PublishSingleFile=${{ matrix.singleFile }} `
+          -p:IncludeNativeLibrariesForSelfExtract=${{ matrix.singleFile }} `
+          -p:EnableCompressionInSingleFile=${{ matrix.singleFile }} `
           -o ./publish/${{ matrix.rid }}
 
     # ZIP/copy steps below don't reliably preserve the Unix executable bit across
@@ -135,18 +152,18 @@ jobs:
       run: chmod +x ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
 
     # Native Apple Silicon (arm64) requires at least an ad-hoc code signature
-    # for the kernel to run a binary at all. Observed on a real macos-latest
-    # run: the unsigned osx-arm64 dotnet-publish output "launched" (a process
-    # existed) but never progressed past that - no downloads, no output -
-    # while osx-x64 (translated through Rosetta 2, which auto-signs what it
-    # translates) worked fine unsigned. Signing here (before the later
-    # Copy-Item to the release-asset filename, and before zipping) means both
-    # the smoke-tested binary and the release asset end up signed - embedded
-    # ad-hoc signatures survive a plain byte copy and Compress-Archive intact.
+    # for the kernel to load and run any Mach-O binary - the main executable
+    # AND every native library it loads (Skia/HarfBuzz etc., bundled by
+    # Avalonia as loose .dylib files now that macOS isn't single-file - see
+    # the "Publish Application" step's comment). --deep on the exe alone only
+    # reaches content nested *inside* it (e.g. an app bundle); it does not
+    # reach sibling files in a plain folder, so each .dylib is signed too.
     - name: Ad-hoc code-sign (macOS)
       if: runner.os == 'macOS'
       shell: bash
-      run: codesign --sign - --force --deep ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
+      run: |
+        codesign --sign - --force --deep ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
+        find ./publish/${{ matrix.rid }} -name "*.dylib" -exec codesign --sign - --force {} \;
 
     # Headless smoke-test: the only real proof (in this whole project) that the
     # Linux dependency-download logic (added in the Linux support phase) actually
@@ -211,7 +228,10 @@ jobs:
       run: |
         SMOKE="$RUNNER_TEMP/smoke"
         mkdir -p "$SMOKE"
-        cp ./publish/${{ matrix.rid }}/${{ matrix.exeName }} "$SMOKE/"
+        # Copy the whole publish folder, not just the exe: macOS is no
+        # longer single-file (see "Publish Application"), so the exe needs
+        # its sibling native libraries alongside it to run at all.
+        cp -R ./publish/${{ matrix.rid }}/. "$SMOKE/"
         chmod +x "$SMOKE/${{ matrix.exeName }}"
         "$SMOKE/${{ matrix.exeName }}" > "$SMOKE/app.log" 2>&1 &
         APP_PID=$!
@@ -244,8 +264,12 @@ jobs:
     - name: Verify publish output
       run: dir ./publish/${{ matrix.rid }}
 
-    # Upload build artifacts
+    # Upload build artifacts. Skipped for macOS: it's no longer single-file
+    # (see "Publish Application"), so the bare exe alone is not a complete,
+    # runnable artifact there - "Upload Full Release Package" below already
+    # covers macOS with the whole publish folder.
     - name: Upload Release Artifacts
+      if: runner.os != 'macOS'
       uses: actions/upload-artifact@v7
       with:
         name: YouTubeDownloader-${{ matrix.rid }}
@@ -261,19 +285,24 @@ jobs:
         if-no-files-found: error
 
     # GitHub release assets must have unique file names across the whole release,
-    # so give the per-RID exe a distinct name before attaching it.
+    # so give the per-RID exe a distinct name before attaching it. Skipped for
+    # macOS: there's no standalone exe asset to prepare (see "Upload Release
+    # Artifacts" above) - the zip from "Package publish folder", already
+    # uniquely named per RID, is macOS's only release asset.
     - name: Prepare release asset names
+      if: runner.os != 'macOS'
       run: Copy-Item ./publish/${{ matrix.rid }}/${{ matrix.exeName }} ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
 
-    - name: Mark release asset executable (Linux/macOS)
-      if: runner.os == 'Linux' || runner.os == 'macOS'
+    - name: Mark release asset executable (Linux)
+      if: runner.os == 'Linux'
       shell: bash
       run: chmod +x ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
 
     # Create/update a GitHub Release and upload the exe and zip as release assets
     # Note: actions/create-release and actions/upload-release-asset are archived/unmaintained,
     # replaced with softprops/action-gh-release which covers both in one step.
-    - name: Create Release
+    - name: Create Release (Windows/Linux)
+      if: runner.os != 'macOS'
       uses: softprops/action-gh-release@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -285,4 +314,21 @@ jobs:
         prerelease: false
         files: |
           ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
+          ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
+
+    # macOS isn't single-file (see "Publish Application"), so only the zip -
+    # the whole publish folder, with its native libraries alongside the exe -
+    # is a valid, runnable release asset; there is no standalone exe to attach.
+    - name: Create Release (macOS)
+      if: runner.os == 'macOS'
+      uses: softprops/action-gh-release@v3
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.get_version.outputs.version }}-${{ github.run_number }}
+        name: v${{ steps.get_version.outputs.version }} (build ${{ github.run_number }})
+        body: Automated release for version ${{ steps.get_version.outputs.version }}, run ${{ github.run_id }} (commit ${{ github.sha }})
+        draft: false
+        prerelease: false
+        files: |
           ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
