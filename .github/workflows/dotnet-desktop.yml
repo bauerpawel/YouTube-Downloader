@@ -134,6 +134,20 @@ jobs:
       shell: bash
       run: chmod +x ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
 
+    # Native Apple Silicon (arm64) requires at least an ad-hoc code signature
+    # for the kernel to run a binary at all. Observed on a real macos-latest
+    # run: the unsigned osx-arm64 dotnet-publish output "launched" (a process
+    # existed) but never progressed past that - no downloads, no output -
+    # while osx-x64 (translated through Rosetta 2, which auto-signs what it
+    # translates) worked fine unsigned. Signing here (before the later
+    # Copy-Item to the release-asset filename, and before zipping) means both
+    # the smoke-tested binary and the release asset end up signed - embedded
+    # ad-hoc signatures survive a plain byte copy and Compress-Archive intact.
+    - name: Ad-hoc code-sign (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: codesign --sign - --force --deep ./publish/${{ matrix.rid }}/${{ matrix.exeName }}
+
     # Headless smoke-test: the only real proof (in this whole project) that the
     # Linux dependency-download logic (added in the Linux support phase) actually
     # works, since local development happens on Windows. linux-x64 only:
