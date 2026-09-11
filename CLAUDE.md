@@ -97,7 +97,7 @@ Named elements (`Name`) become strongly-typed, non-nullable code-behind fields a
 
 #### 3. Dependency Management (`MainWindow.axaml.cs`)
 
-All three dependency downloaders are OS-conditional (checked via `OperatingSystem.IsWindows()` and, on non-Windows, `RuntimeInformation.ProcessArchitecture` to distinguish x64 vs ARM64). Windows behavior is unchanged from the original WinForms/single-OS app; Linux (x64 + ARM64) is a parallel code path added alongside it, not a replacement.
+All three dependency downloaders are OS-conditional (checked via `OperatingSystem.IsWindows()` and, on non-Windows, `RuntimeInformation.ProcessArchitecture` to distinguish x64 vs ARM64). Windows behavior is unchanged from the original WinForms/single-OS app; Linux (x64 + ARM64) and macOS (x64 + ARM64) are parallel code paths added alongside it, not a replacement.
 
 **CheckAndDownloadComponents()**
 - Checks for Deno/Node.js runtime availability (`IsRuntimeInPath()`)
