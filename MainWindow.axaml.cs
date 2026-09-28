@@ -62,13 +62,8 @@ public partial class MainWindow : Window
         CbContentType.SelectedIndex = 0;
         CbContentType.SelectionChanged += ContentType_Changed;
 
-        CbQuality.Items.Add("Najlepsza");
-        CbQuality.Items.Add("4K (2160p)");
-        CbQuality.Items.Add("1080p");
-        CbQuality.Items.Add("720p");
-        CbQuality.Items.Add("480p");
-        CbQuality.Items.Add("360p");
-        CbQuality.Items.Add("240p");
+        foreach (int? height in YtDlpArguments.QualityHeights)
+            CbQuality.Items.Add(YtDlpArguments.QualityLabel(height, "Najlepsza"));
         CbQuality.SelectedIndex = 0;
 
         CbFormat.Items.Add("mp4");
@@ -822,50 +817,11 @@ public partial class MainWindow : Window
 
     private string BuildYtDlpArguments()
     {
-        string args = "";
-
-        if (CbContentType.SelectedIndex == 1)
-        {
-            args = " -f bestaudio --extract-audio --audio-format mp3 --audio-quality 192";
-        }
-        else
-        {
-            string quality = CbQuality.SelectedItem?.ToString() ?? "Najlepsza";
-            string format = CbFormat.SelectedItem?.ToString() ?? "mp4";
-
-            if (quality == "Najlepsza")
-            {
-                args = " -f bestvideo+bestaudio/best";
-            }
-            else if (quality == "4K (2160p)")
-            {
-                args = " -f bestvideo[height<=2160]+bestaudio/best[height<=2160]";
-            }
-            else if (quality == "1080p")
-            {
-                args = " -f bestvideo[height<=1080]+bestaudio/best[height<=1080]";
-            }
-            else
-            {
-                string heightStr = quality.Replace("p", "");
-                args = " -f bestvideo[height<=" + heightStr + "]+bestaudio/best[height<=" + heightStr + "]";
-            }
-
-            if (format == "mp4")
-            {
-                args += " --remux-video mp4";
-            }
-            else if (format == "webm")
-            {
-                args += " --remux-video webm";
-            }
-            else if (format == "mkv")
-            {
-                args += " --merge-output-format mkv";
-            }
-        }
-
-        return args;
+        int qualityIndex = Math.Max(CbQuality.SelectedIndex, 0);
+        return YtDlpArguments.Build(
+            CbContentType.SelectedIndex == 1,
+            YtDlpArguments.QualityHeights[qualityIndex],
+            CbFormat.SelectedItem?.ToString() ?? "mp4");
     }
 
     private void ParseDownloadProgress(string line, string statusPrefix = "")
