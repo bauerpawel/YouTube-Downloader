@@ -14,6 +14,9 @@ public partial class MessageDialog : Window
 
     private MessageDialog(string message, string title, bool isConfirmation) : this()
     {
+        // A dialog nobody can click blocks a headless CI smoke test forever; log it so
+        // the CI output shows which error stopped the app.
+        Console.WriteLine($"[dialog] {title}: {message}");
         Title = title;
         MessageText.Text = message;
 

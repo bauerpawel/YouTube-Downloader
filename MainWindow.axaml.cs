@@ -157,6 +157,9 @@ public partial class MainWindow : Window
     private void UpdateStatus(string message)
     {
         LblStatus.Text = message;
+        // Mirrored to stdout: invisible to users (no console on a GUI app), but it is
+        // the only trace a headless CI smoke test gets of where startup stopped.
+        Console.WriteLine("[status] " + message);
     }
 
     // One switch for everything that must not overlap: video downloads, component
