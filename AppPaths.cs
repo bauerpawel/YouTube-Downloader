@@ -107,12 +107,15 @@ internal static class AppPaths
     // `where` (Windows) searches the current directory before PATH, and a
     // double-clicked app runs with its own folder as the current directory - so
     // a hit there is the app's own old copy, not a system-wide install.
+    // A GUI app also gets `where` output in the OEM code page decoded as ANSI, so
+    // a non-ASCII folder (C:\Users\Michał\...) comes back mangled and no longer
+    // matches excludedDirectory - such a line names no real file and is skipped.
     public static string PickFirstPathOutside(string commandOutput, string excludedDirectory)
     {
         foreach (string line in commandOutput.Split('\n'))
         {
             string path = line.Trim();
-            if (path.Length == 0)
+            if (path.Length == 0 || !File.Exists(path))
                 continue;
 
             string? directory = Path.GetDirectoryName(path);

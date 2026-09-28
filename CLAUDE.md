@@ -122,7 +122,7 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - All operations are async and report progress via `UpdateStatus()`
 
 **IsRuntimeInPath() / GetRuntimePath() / CheckAndUpdateDeno()'s "system runtime" check - three distinct mechanisms, not one**
-- `FindSystemDeno()` shells out to `where deno` (Windows) / `which deno` (Linux/macOS) and returns the first hit **outside the app folder** (`AppPaths.PickFirstPathOutside()`): `where` searches the current directory first, which for a double-clicked app is the app folder - an old `deno.exe` left there by a pre-2.0.280926 version must not count as system-wide. `where` also prints every match on its own line, so the raw output is never used as a path
+- `FindSystemDeno()` shells out to `where deno` (Windows) / `which deno` (Linux/macOS) and returns the first hit that **exists and lies outside the app folder** (`AppPaths.PickFirstPathOutside()`): `where` searches the current directory first, which for a double-clicked app is the app folder - an old `deno.exe` left there by a pre-2.0.280926 version must not count as system-wide. A GUI app also receives `where` output in the OEM code page decoded as ANSI, so a non-ASCII path (`C:\Users\Michał\Downloads`) comes back mangled and would no longer match the app folder - the `File.Exists` check drops such lines. `where` also prints every match on its own line, so the raw output is never used as a path
 - `IsRuntimeInPath()` (called from `CheckAndDownloadComponents()` to decide whether Deno must be auto-downloaded) is `FindSystemDeno() != ""`
 - `GetRuntimePath()` (used to build the yt-dlp `--js-runtimes` invocation) returns the data-folder `denoPath`, then `nodeJsPath` (data folder first, then app folder), then `FindSystemDeno()`
 - `CheckAndUpdateDeno()` (used by the "Update Components" menu action) does **not** shell out at all: it only checks `File.Exists(denoPath)` as a local proxy - if the app's own managed `deno` binary isn't present, it assumes a system/external runtime is in use and skips the version-check/update entirely
@@ -223,7 +223,7 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - If the app folder is not writable, offers the release page in the browser instead
 - Downloads to `<exe>.new` (Windows/Linux) or `YouTubeDownloader-update.zip` extracted to `YouTubeDownloader-update/` (macOS), verifies size (and SHA-256 when the API gives a `digest`), then `AppUpdater.ApplyUpdate()`: every existing target -> `.old`, every new file -> target, full rollback on any failure. The running exe's `.old` on Windows is removed by `AppUpdater.CleanupLeftovers()` on the next start
 - Relaunches `Environment.ProcessPath` and shuts down. The exe file name is never assumed
-- While a download or component update runs, `SetBusy(true)` disables both `BtnDownload` and `MiSprawdzAktualizacje`; the startup check skips itself when `BtnDownload` is disabled
+- `SetBusy(true)` disables `BtnDownload`, `MiSprawdzAktualizacje` and `MiAktualizujKomponenty` for the whole of `CheckAndDownloadComponents()` (startup tool downloads), `AktualizujKomponenty_Click()`, video downloads and the self-update itself - so an update's final shutdown can never cut a component download short. The startup check runs after `SetBusy(false)` and skips itself whenever `BtnDownload` is disabled
 
 #### 7. About & Message Dialogs
 **AboutWindow** (`AboutWindow.axaml` / `.axaml.cs`)

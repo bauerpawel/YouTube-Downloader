@@ -159,16 +159,21 @@ public partial class MainWindow : Window
         LblStatus.Text = message;
     }
 
+    // One switch for everything that must not overlap: video downloads, component
+    // downloads/updates and the app self-update (which ends in a shutdown that would
+    // otherwise cut a component download short and leave a truncated binary behind).
     private void SetBusy(bool busy)
     {
         BtnDownload.IsEnabled = !busy;
         MiSprawdzAktualizacje.IsEnabled = !busy;
+        MiAktualizujKomponenty.IsEnabled = !busy;
     }
 
     // ---- Dependency management ----
 
     private async void CheckAndDownloadComponents()
     {
+        SetBusy(true);
         UpdateStatus("Sprawdzanie komponentow...");
 
         bool hasRuntime = File.Exists(denoPath) || File.Exists(nodeJsPath) || IsRuntimeInPath();
@@ -193,6 +198,8 @@ public partial class MainWindow : Window
         // those copies only once working replacements exist in the data directory.
         if (File.Exists(ytDlpPath) && Directory.Exists(ffmpegBinPath) && !string.IsNullOrEmpty(GetRuntimePath()))
             AppPaths.CleanupLegacyFiles(appDirectory, dataDirectory);
+
+        SetBusy(false);
 
         // async void caller: nothing may escape from here, and the startup check
         // must never bother the user with errors (offline, API rate limit).
