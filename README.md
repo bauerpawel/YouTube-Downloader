@@ -187,6 +187,7 @@ YouTube-Downloader/
 ├── ThemeSettings.cs             # Zapis/odczyt wybranego motywu (theme.txt)
 ├── AppPaths.cs                  # Folder aplikacji vs katalog danych użytkownika, sprzątanie starych plików
 ├── AppUpdater.cs                # Samoaktualizacja aplikacji z GitHub Releases
+├── GitHubApi.cs                 # Zapytania do GitHub API (opcjonalny token YTD_GITHUB_TOKEN w CI)
 ├── Assets/
 │   └── app-logo.png             # Logo aplikacji, widoczne w oknie Informacje i oknach komunikatów
 ├── YouTubeDownloader.csproj     # Konfiguracja projektu .NET 10 (pakiety Avalonia)
@@ -389,6 +390,7 @@ YouTube-Downloader/
 ├── ThemeSettings.cs             # Loads/saves the chosen theme (theme.txt)
 ├── AppPaths.cs                  # App folder vs per-user data folder, legacy-file cleanup
 ├── AppUpdater.cs                # App self-update from GitHub Releases
+├── GitHubApi.cs                 # GitHub API requests (optional YTD_GITHUB_TOKEN in CI)
 ├── Assets/
 │   └── app-logo.png             # Application logo, shown in About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
