@@ -177,6 +177,11 @@ jobs:
     - name: Smoke-test published binary (linux-x64 only)
       if: matrix.rid == 'linux-x64'
       shell: bash
+      # Authenticates the app's GitHub API calls (GitHubApi.cs). Anonymous calls
+      # share a 60/hour limit per runner IP, and when it runs out the app stops at
+      # an error dialog nobody can click - the smoke test then fails at random.
+      env:
+        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         sudo apt-get update
         sudo apt-get install -y xvfb libx11-6 libice6 libsm6 fontconfig fonts-dejavu-core
@@ -226,6 +231,10 @@ jobs:
     - name: Smoke-test published binary (macOS)
       if: runner.os == 'macOS'
       shell: bash
+      # See the Linux smoke test: authenticated GitHub API calls. Shared macOS
+      # runner IPs regularly exhaust the anonymous limit (run 36451352366).
+      env:
+        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         SMOKE="$RUNNER_TEMP/smoke"
         mkdir -p "$SMOKE"

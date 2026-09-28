@@ -279,7 +279,7 @@ public partial class MainWindow : Window
         {
             string apiUrl = "https://api.github.com/repos/denoland/deno/releases/latest";
 
-            var response = await httpClient.GetStringAsync(apiUrl);
+            var response = await GitHubApi.GetStringAsync(httpClient, apiUrl);
             var jsonDoc = JsonDocument.Parse(response);
             var root = jsonDoc.RootElement;
 
@@ -403,7 +403,7 @@ public partial class MainWindow : Window
         try
         {
             string releasesUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases";
-            var response = await httpClient.GetStringAsync(releasesUrl);
+            var response = await GitHubApi.GetStringAsync(httpClient, releasesUrl);
             var jsonDoc = JsonDocument.Parse(response);
             var releases = jsonDoc.RootElement;
 
@@ -456,7 +456,7 @@ public partial class MainWindow : Window
         {
             string apiUrl = "https://api.github.com/repos/eugeneware/ffmpeg-static/releases/latest";
 
-            var response = await httpClient.GetStringAsync(apiUrl);
+            var response = await GitHubApi.GetStringAsync(httpClient, apiUrl);
             var jsonDoc = JsonDocument.Parse(response);
             var root = jsonDoc.RootElement;
 

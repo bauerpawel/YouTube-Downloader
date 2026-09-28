@@ -45,6 +45,8 @@ jobs:
         curl -s https://api.github.com/rate_limit | grep -A4 '"core"' || true
 
     - name: Smoke-test with diagnostics
+      env:
+        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         SMOKE="$RUNNER_TEMP/smoke"
         DATA_DIR="$HOME/Library/Application Support/YouTubeDownloader"

@@ -76,7 +76,7 @@ internal static class AppUpdater
 
     public static async Task<ReleaseInfo> GetLatestReleaseAsync(HttpClient http, string apiUrl = LatestReleaseUrl)
     {
-        string json = await http.GetStringAsync(apiUrl);
+        string json = await GitHubApi.GetStringAsync(http, apiUrl);
         return ParseRelease(json, GetAssetName());
     }
 
