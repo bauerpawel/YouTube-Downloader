@@ -26,6 +26,10 @@ YouTube-Downloader/
 ├── MessageDialog.axaml          # Reusable message/confirmation dialog UI layout (XAML)
 ├── MessageDialog.axaml.cs       # Reusable message/confirmation dialog logic
 │                                 # (replaces WinForms MessageBox)
+├── ThemeSettings.cs             # Loads/saves the Light/Dark/System theme choice (theme.txt)
+├── AppPaths.cs                  # App folder vs per-user data folder, legacy-file cleanup,
+│                                 # MakeExecutable() and safe-delete helpers (no Avalonia)
+├── AppUpdater.cs                # App self-update from GitHub Releases (no UI, no Avalonia)
 ├── Assets/
 │   └── app-logo.png             # Application logo, shown in About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
@@ -40,26 +44,38 @@ YouTube-Downloader/
 
 ### Runtime Structure (Created at Runtime)
 
+The app keeps two locations apart (`AppPaths.cs`):
+
+- **App folder** (`AppPaths.AppDirectory`, where the executable lives) holds only the app itself and `downloads/`. Self-update replaces files here and nothing else.
+- **Data folder** (`AppPaths.DataDirectory`) holds everything the app downloads or writes: `%LOCALAPPDATA%\YouTubeDownloader` (Windows), `~/.local/share/YouTubeDownloader` (Linux, honours `XDG_DATA_HOME`), `~/Library/Application Support/YouTubeDownloader` (macOS), `$SNAP_USER_COMMON` inside a snap. Falls back to the app folder if the per-user location is unavailable.
+
 On Windows:
 ```
 Application Directory/
+├── YouTubeDownloader.exe       # The app (any file name - often the release asset name)
+├── node.exe                    # Optional, user-supplied; also looked up in the data folder first
+└── downloads/                  # Default download location
+    └── (downloaded videos)
+
+Data Directory/
 ├── yt-dlp.exe                  # YouTube downloader CLI tool
 ├── deno.exe                    # Deno runtime (auto-downloaded if not in PATH)
 ├── deno_version.txt            # Tracks installed Deno version for update checks
-├── node.exe                    # Alternative Node.js runtime
+├── node.exe                    # Optional, user-supplied alternative runtime
 ├── ffmpeg_bin/                 # FFmpeg binaries directory
 │   ├── ffmpeg.exe
 │   ├── ffprobe.exe
 │   ├── ffplay.exe
 │   └── *.dll                   # FFmpeg shared libraries (win64-gpl-shared build)
 ├── ffmpeg_version.txt          # Tracks current FFmpeg version
-└── downloads/                  # Default download location
-    └── (downloaded videos)
+└── theme.txt                   # Light/Dark/Default theme choice
 ```
 
-On Linux, the layout is identical but every binary lacks the `.exe` extension (`yt-dlp`, `deno`, `node`), and `ffmpeg_bin/` holds `ffmpeg`/`ffprobe`/`ffplay` - no `*.so` companions, because the Linux download is the **static** FFmpeg build rather than `-shared` (see Dependency Management below for why). All downloaded/extracted binaries are marked executable via `MakeExecutable()` - strictly required for the raw HTTP download (yt-dlp has no archive to carry a Unix mode), and applied defensively after `tar`/`ZipFile` extraction too, since archive-recorded permissions can't always be relied on.
+**Migration from older versions:** versions before 2.0.280926 kept the tools next to the exe. `AppPaths.CleanupLegacyFiles()` (called at the end of `CheckAndDownloadComponents()` once working copies exist in the data folder) deletes exactly `yt-dlp(.exe)`, `deno(.exe)`, `deno_version.txt`, `theme.txt`, `ffmpeg_bin/`, `ffmpeg_temp/` and finally the marker `ffmpeg_version.txt` - but only when that marker exists (proof the folder was managed by an old version; the app folder may be the user's Downloads folder). `node`, `downloads/` and the old temp archives are never touched.
 
-On macOS, the layout is structurally different for FFmpeg specifically: the macOS FFmpeg source (`eugeneware/ffmpeg-static`) publishes two loose, already-executable binaries (`ffmpeg`, `ffprobe`) rather than an archive containing a `bin/` folder, so `ffmpeg_bin/` on macOS never holds anything beyond those two files - there is no `ffplay`, since `eugeneware/ffmpeg-static` doesn't publish one. yt-dlp on macOS, by contrast, is a single `universal2` binary (`yt-dlp_macos`) covering both x64 and ARM64 - unlike Deno and FFmpeg, there is no separate per-architecture asset to pick between.
+On Linux, the data-folder layout is identical but every binary lacks the `.exe` extension (`yt-dlp`, `deno`, `node`), and `ffmpeg_bin/` holds `ffmpeg`/`ffprobe`/`ffplay` - no `*.so` companions, because the Linux download is the **static** FFmpeg build rather than `-shared` (see Dependency Management below for why). All downloaded/extracted binaries are marked executable via `MakeExecutable()` - strictly required for the raw HTTP download (yt-dlp has no archive to carry a Unix mode), and applied defensively after `tar`/`ZipFile` extraction too, since archive-recorded permissions can't always be relied on.
+
+On macOS, the data-folder layout is structurally different for FFmpeg specifically: the macOS FFmpeg source (`eugeneware/ffmpeg-static`) publishes two loose, already-executable binaries (`ffmpeg`, `ffprobe`) rather than an archive containing a `bin/` folder, so `ffmpeg_bin/` on macOS never holds anything beyond those two files - there is no `ffplay`, since `eugeneware/ffmpeg-static` doesn't publish one. yt-dlp on macOS, by contrast, is a single `universal2` binary (`yt-dlp_macos`) covering both x64 and ARM64 - unlike Deno and FFmpeg, there is no separate per-architecture asset to pick between.
 
 ## Codebase Architecture
 
@@ -84,6 +100,7 @@ Named elements (`Name`) become strongly-typed, non-nullable code-behind fields a
 - `ProgressBarDownload`: ProgressBar for download progress
 - `LblStatus`: TextBlock for status messages and real-time progress
 - `MiAktualizujKomponenty` / `MiInformacje`: menu items for "Aktualizuj komponenty" (Update Components) / "Informacje" (About)
+- `MiSprawdzAktualizacje`: menu item "Sprawdz aktualizacje aplikacji" (Check for app updates), next to "Aktualizuj komponenty"
 
 #### 2. Multi-URL Handling (`MainWindow.axaml.cs`)
 **BtnAddUrl_Click() / RemoveUrlRow()**
@@ -105,9 +122,10 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - All operations are async and report progress via `UpdateStatus()`
 
 **IsRuntimeInPath() / GetRuntimePath() / CheckAndUpdateDeno()'s "system runtime" check - three distinct mechanisms, not one**
-- `IsRuntimeInPath()` (called from `CheckAndDownloadComponents()`, to decide whether Deno needs to be auto-downloaded on first run) is the one that actually shells out: `where deno` on Windows, `which deno` on Linux/macOS (`OperatingSystem.IsWindows() ? "where" : "which"`), treating a zero exit code as "a system-wide Deno is available"
-- `GetRuntimePath()` (used to build the yt-dlp `--js-runtimes` invocation) first checks `File.Exists()` for the app-managed `denoPath`/`nodeJsPath`, and only falls back to the same `where`/`which` shell-out - returning its stdout as the runtime path - if neither local binary exists
-- `CheckAndUpdateDeno()` (used by the "Update Components" menu action) does **not** shell out at all: it only checks `File.Exists(denoPath)` as a local proxy - if the app's own managed `deno` binary isn't present, it assumes a system/external runtime is in use and skips the version-check/update entirely, without querying `where`/`which` itself
+- `FindSystemDeno()` shells out to `where deno` (Windows) / `which deno` (Linux/macOS) and returns the first hit **outside the app folder** (`AppPaths.PickFirstPathOutside()`): `where` searches the current directory first, which for a double-clicked app is the app folder - an old `deno.exe` left there by a pre-2.0.280926 version must not count as system-wide. `where` also prints every match on its own line, so the raw output is never used as a path
+- `IsRuntimeInPath()` (called from `CheckAndDownloadComponents()` to decide whether Deno must be auto-downloaded) is `FindSystemDeno() != ""`
+- `GetRuntimePath()` (used to build the yt-dlp `--js-runtimes` invocation) returns the data-folder `denoPath`, then `nodeJsPath` (data folder first, then app folder), then `FindSystemDeno()`
+- `CheckAndUpdateDeno()` (used by the "Update Components" menu action) does **not** shell out at all: it only checks `File.Exists(denoPath)` as a local proxy - if the app's own managed `deno` binary isn't present, it assumes a system/external runtime is in use and skips the version-check/update entirely
 
 **GetDenoAssetName() / DownloadDeno() / GetLatestDenoInfo()**
 - Queries the GitHub API for the latest Deno release, picks the matching asset by name via `GetDenoAssetName()`:
@@ -141,8 +159,9 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - The two matched assets are raw executable binaries, not an archive - nothing is extracted; they're downloaded directly to `ffmpeg_bin/ffmpeg` and `ffmpeg_bin/ffprobe` and marked executable via the existing `MakeExecutable()` helper
 - `DownloadFFmpeg()` and `CheckAndUpdateFFmpeg()` both branch to this path via `OperatingSystem.IsMacOS()` before reaching any BtbN-specific code
 
-**MakeExecutable()**
+**AppPaths.MakeExecutable()**
 - No-op on Windows. On Linux/macOS, calls `File.SetUnixFileMode()` to set `rwxr-xr-x` (user read/write/execute, group/other read/execute) on the given path. Needed because neither a plain HTTP download nor `ZipFile`/`tar` extraction preserves (or sets) the Unix executable bit, so every downloaded yt-dlp/Deno/FFmpeg binary would otherwise be non-executable on first run
+- Moved out of `MainWindow` so `AppUpdater` can use it too
 
 **DownloadFileWithProgress()**
 - Shared helper: streams an HTTP download to disk while reporting progress on `ProgressBarDownload`
@@ -195,6 +214,16 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 **CheckAndUpdateFFmpeg()**
 - Compares local version with latest GitHub release
 - Downloads and reinstalls if version mismatch, preserves the version tracking file
+
+**CheckForAppUpdate(bool silent) / InstallAppUpdate()** (app self-update, logic in `AppUpdater.cs`)
+- Runs silently at the end of `CheckAndDownloadComponents()` and loudly from `MiSprawdzAktualizacje`. Silent mode never shows errors (offline, GitHub API rate limit)
+- Off inside a snap (`AppPaths.IsSnap` - the Snap Store updates it) and for local builds (no `BuildNumber` metadata)
+- Compares `AppUpdater.GetLocalBuildNumber()` with the number after the last `-` in the latest release tag (`v<Version>-<run_number>`). `<Version>` itself (`2.0.ddMMyy`) is not monotonic and is never compared. Every CI build with a higher run number counts as a new version
+- Picks the asset by exact name (`AppUpdater.GetAssetName()`): `YouTubeDownloader-{win-x64,win-arm64}.exe`, `YouTubeDownloader-{linux-x64,linux-arm64}`, `YouTubeDownloader-{osx-x64,osx-arm64}.zip`. A release still being published (asset missing) is treated as "no update yet"
+- If the app folder is not writable, offers the release page in the browser instead
+- Downloads to `<exe>.new` (Windows/Linux) or `YouTubeDownloader-update.zip` extracted to `YouTubeDownloader-update/` (macOS), verifies size (and SHA-256 when the API gives a `digest`), then `AppUpdater.ApplyUpdate()`: every existing target -> `.old`, every new file -> target, full rollback on any failure. The running exe's `.old` on Windows is removed by `AppUpdater.CleanupLeftovers()` on the next start
+- Relaunches `Environment.ProcessPath` and shuts down. The exe file name is never assumed
+- While a download or component update runs, `SetBusy(true)` disables both `BtnDownload` and `MiSprawdzAktualizacje`; the startup check skips itself when `BtnDownload` is disabled
 
 #### 7. About & Message Dialogs
 **AboutWindow** (`AboutWindow.axaml` / `.axaml.cs`)
@@ -253,7 +282,7 @@ build.bat all
 ./build.sh all
 ```
 
-CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes all six RIDs - `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64` - on every push to `main`, running across `windows-latest`, `ubuntu-latest`, and `macos-latest` runners and attaching all six artifacts to the automated GitHub Release; the Linux jobs additionally run a headless launch smoke-test under `xvfb-run` (see Testing Changes below). The `macos-latest` runner is ARM64, so the `osx-x64` leg builds via cross-compilation and is smoke-tested there through Rosetta 2, which CI installs explicitly as its own step since it is not preinstalled on the runner image. Dependency downloads and runtime detection are now OS-conditional rather than Windows-only: Windows targets `yt-dlp.exe`/`deno.exe`/the `win64-gpl-shared` FFmpeg build and shells out to `where`; Linux targets the `yt-dlp_linux*`/`deno-*-unknown-linux-gnu.zip`/static-`gpl` FFmpeg assets and shells out to `which`; macOS targets `yt-dlp_macos`/`deno-*-apple-darwin.zip`/the `eugeneware/ffmpeg-static` binaries and also shells out to `which` (see Dependency Management above for the full OS split).
+CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes all six RIDs - `win-x64`, `win-arm64`, `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64` - on every push to `main`, running across `windows-latest`, `ubuntu-latest`, and `macos-latest` runners and attaching all six artifacts to the automated GitHub Release; the Linux jobs additionally run a headless launch smoke-test under `xvfb-run` (see Testing Changes below). The publish step passes `-p:BuildNumber=${{ github.run_number }}`, which the self-updater compares against release tags. Both the Linux and macOS smoke tests assert that the tools landed in the data folder (`~/.local/share/YouTubeDownloader`, `~/Library/Application Support/YouTubeDownloader`) and not next to the exe. Never run the workflow via `workflow_dispatch` from a feature branch - the publish job creates a real GitHub Release that the self-updater offers to every user. The `macos-latest` runner is ARM64, so the `osx-x64` leg builds via cross-compilation and is smoke-tested there through Rosetta 2, which CI installs explicitly as its own step since it is not preinstalled on the runner image. Dependency downloads and runtime detection are now OS-conditional rather than Windows-only: Windows targets `yt-dlp.exe`/`deno.exe`/the `win64-gpl-shared` FFmpeg build and shells out to `where`; Linux targets the `yt-dlp_linux*`/`deno-*-unknown-linux-gnu.zip`/static-`gpl` FFmpeg assets and shells out to `which`; macOS targets `yt-dlp_macos`/`deno-*-apple-darwin.zip`/the `eugeneware/ffmpeg-static` binaries and also shells out to `which` (see Dependency Management above for the full OS split).
 
 ### Testing Changes
 
@@ -372,6 +401,7 @@ The application parses yt-dlp output using regex patterns:
    - Add a download method following the `DownloadDeno()` pattern
    - Call it from `CheckAndDownloadComponents()`
    - Add version tracking if needed
+   - Download it into `dataDirectory`, never `appDirectory`
 
 ### Modifying Existing Features
 
@@ -472,6 +502,10 @@ Before committing changes, verify:
 - [ ] URL normalization handles edge cases
 - [ ] Files save to downloads directory
 - [ ] Process cleanup occurs on errors
+- [ ] Tools download into the data folder, not next to the exe; an old install's copies next to the exe are removed
+- [ ] Theme choice survives a restart (theme.txt in the data folder)
+- [ ] "Sprawdz aktualizacje aplikacji" on a local build shows the "aktualizacje wylaczone" message
+- [ ] A CI build older than the latest release offers the update, installs it and restarts
 
 ## External Dependencies
 
@@ -502,6 +536,8 @@ Future dependency/CVE audits must cover these NuGet packages in addition to the 
 ### App Version
 
 `<Version>` in `YouTubeDownloader.csproj` is the single source of truth for the app's version number (format: `Major.Minor.<ddMMyy>`, e.g. `2.0.110926` for 2026-09-11 - a date-based build number, not semantic versioning). `AssemblyVersion`/`FileVersion` are pinned separately to `2.0.0.0` in the same file, since .NET requires each of their four components to fit in 16 bits (max 65535) and a `ddMMyy` build number regularly exceeds that - only `AssemblyInformationalVersionAttribute` (populated from `<Version>` with no such limit) can hold the full date-based string. `AboutWindow.axaml.cs`'s `GetAppVersion()` reads that attribute via reflection at runtime, so the About dialog always matches `<Version>` without a second manual edit. CI's `publish` job reads the same property (`dotnet msbuild ... -getProperty:Version`) to name the GitHub Release (`v<version>-<run_number>`) - bump `<Version>` here and every consumer (About dialog, release tag/name) picks it up automatically; `README.md`'s version badge and "What's New" section are the one place that still needs a manual edit per release, since they're prose, not something a build step can regenerate.
+
+Separately, CI passes `github.run_number` as the MSBuild property `BuildNumber`, which `YouTubeDownloader.csproj` turns into `AssemblyMetadata("BuildNumber", ...)` only when set. That number - not `<Version>` - is what the self-updater compares, and the About dialog shows it as "(build N)". Local builds have no build number, so self-update is off for them.
 
 ## macOS Gatekeeper Notice
 
@@ -539,11 +575,10 @@ This project follows standard Git practices:
 6. **Download Queue**: Support multiple simultaneous downloads
 7. **Format Conversion**: Post-download conversion options
 8. **Portable Mode**: Config file for portable installations
-9. **Update Notifications**: Check for application updates
-10. **Subtitle Download**: Option to download subtitles/captions
+9. **Subtitle Download**: Option to download subtitles/captions
 
 ---
 
-**Last Updated**: 2026-09-10
+**Last Updated**: 2026-09-28
 **For**: AI Assistants (Claude, etc.)
 **Project**: YouTube Downloader for Windows, Linux, and macOS (.NET 10)

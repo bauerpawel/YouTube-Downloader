@@ -4,7 +4,7 @@
 
 <img src="logo.svg" alt="YouTube Downloader Logo" width="480"/>
 
-![Version](https://img.shields.io/badge/Version-2.0.110926-brightgreen)
+![Version](https://img.shields.io/badge/Version-2.0.280926-brightgreen)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-0078D6?logo=windows)
@@ -25,6 +25,11 @@
 ### 📝 Opis
 
 YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64), zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
+
+### 🆕 Co nowego w wersji 2.0.280926
+
+- ⬆️ **Automatyczna aktualizacja aplikacji** - przy starcie aplikacja sprawdza, czy na GitHubie jest nowsza wersja, i proponuje jej instalację (ręcznie: Narzedzia -> "Sprawdz aktualizacje aplikacji"). Po akceptacji pobiera nową wersję, podmienia się i uruchamia ponownie
+- 📁 **Narzędzia w katalogu danych użytkownika** - yt-dlp, FFmpeg, Deno i wybrany motyw są teraz przechowywane w `%LOCALAPPDATA%\YouTubeDownloader` (Windows), `~/.local/share/YouTubeDownloader` (Linux) lub `~/Library/Application Support/YouTubeDownloader` (macOS), a nie obok pliku aplikacji. Przy pierwszym uruchomieniu nowej wersji narzędzia pobiorą się ponownie, stare kopie obok aplikacji zostaną usunięte, a motyw wróci do domyślnego
 
 ### 🆕 Co nowego w wersji 2.0.110926
 
@@ -179,6 +184,9 @@ YouTube-Downloader/
 ├── MessageDialog.axaml          # Układ UI okna komunikatów/potwierdzeń wielokrotnego użytku (XAML)
 ├── MessageDialog.axaml.cs       # Logika okna komunikatów/potwierdzeń wielokrotnego użytku
 │                                 # (zastępuje WinForms MessageBox)
+├── ThemeSettings.cs             # Zapis/odczyt wybranego motywu (theme.txt)
+├── AppPaths.cs                  # Folder aplikacji vs katalog danych użytkownika, sprzątanie starych plików
+├── AppUpdater.cs                # Samoaktualizacja aplikacji z GitHub Releases
 ├── Assets/
 │   └── app-logo.png             # Logo aplikacji, widoczne w oknie Informacje i oknach komunikatów
 ├── YouTubeDownloader.csproj     # Konfiguracja projektu .NET 10 (pakiety Avalonia)
@@ -200,6 +208,8 @@ YouTube-Downloader/
 - **[FFmpeg](https://ffmpeg.org/)** - Przetwarzanie audio/wideo (Windows/Linux: [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds); macOS: [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), ponieważ BtbN/FFmpeg-Builds nie publikuje wersji dla macOS)
 - **[Deno](https://deno.com/)** - Runtime JavaScript/TypeScript dla yt-dlp (opcjonalnie [Node.js](https://nodejs.org/))
 
+Narzędzia są zapisywane w katalogu danych użytkownika: `%LOCALAPPDATA%\YouTubeDownloader` (Windows), `~/.local/share/YouTubeDownloader` (Linux), `~/Library/Application Support/YouTubeDownloader` (macOS).
+
 **Uwaga (macOS)**: binarki nie są podpisane - przy pierwszym uruchomieniu system pokaże ostrzeżenie Gatekeeper, patrz sekcja "Gatekeeper (macOS)" powyżej.
 
 ### 📄 Licencja
@@ -217,6 +227,11 @@ Zgłoszenia błędów i pull requesty są mile widziane na GitHub.
 ### 📝 Description
 
 YouTube Downloader is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
+
+### 🆕 What's New in 2.0.280926
+
+- ⬆️ **Automatic app updates** - on startup the app checks GitHub for a newer version and offers to install it (manually: Narzedzia (Tools) -> "Sprawdz aktualizacje aplikacji" (Check for app updates)). Once accepted, it downloads the new version, swaps itself out and restarts
+- 📁 **Tools in the per-user data folder** - yt-dlp, FFmpeg, Deno and the chosen theme now live in `%LOCALAPPDATA%\YouTubeDownloader` (Windows), `~/.local/share/YouTubeDownloader` (Linux) or `~/Library/Application Support/YouTubeDownloader` (macOS) instead of next to the app. On the first launch of the new version the tools are downloaded again, old copies next to the app are removed, and the theme resets to the default
 
 ### 🆕 What's New in 2.0.110926
 
@@ -371,6 +386,9 @@ YouTube-Downloader/
 ├── MessageDialog.axaml          # Reusable message/confirmation dialog UI layout (XAML)
 ├── MessageDialog.axaml.cs       # Reusable message/confirmation dialog logic
 │                                 # (replaces WinForms MessageBox)
+├── ThemeSettings.cs             # Loads/saves the chosen theme (theme.txt)
+├── AppPaths.cs                  # App folder vs per-user data folder, legacy-file cleanup
+├── AppUpdater.cs                # App self-update from GitHub Releases
 ├── Assets/
 │   └── app-logo.png             # Application logo, shown in About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
@@ -391,6 +409,8 @@ YouTube-Downloader/
 - **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** - YouTube downloading tool
 - **[FFmpeg](https://ffmpeg.org/)** - Audio/video processing (Windows/Linux: [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds); macOS: [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), since BtbN/FFmpeg-Builds doesn't publish macOS builds)
 - **[Deno](https://deno.com/)** - JavaScript/TypeScript runtime for yt-dlp (alternatively [Node.js](https://nodejs.org/))
+
+The tools are stored in the per-user data folder: `%LOCALAPPDATA%\YouTubeDownloader` (Windows), `~/.local/share/YouTubeDownloader` (Linux), `~/Library/Application Support/YouTubeDownloader` (macOS).
 
 **Note (macOS)**: binaries are unsigned - on first launch macOS Gatekeeper will show a warning, see the "Gatekeeper (macOS)" section above.
 
