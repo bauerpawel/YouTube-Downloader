@@ -12,6 +12,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 
@@ -50,6 +51,10 @@ public partial class MainWindow : Window
         string dataNodePath = Path.Combine(dataDirectory, nodeName);
         nodeJsPath = File.Exists(dataNodePath) ? dataNodePath : Path.Combine(appDirectory, nodeName);
 
+        // Remove what a previous self-update left behind (<exe>.old on Windows is
+        // only deletable once the old process has exited).
+        AppUpdater.CleanupLeftovers(appDirectory, Environment.ProcessPath);
+
         InitializeComponent();
 
         CbContentType.Items.Add("Wideo + Audio");
@@ -74,6 +79,7 @@ public partial class MainWindow : Window
         BtnAddUrl.Click += BtnAddUrl_Click;
         BtnDownload.Click += async (s, e) => await BtnDownload_Click();
         MiAktualizujKomponenty.Click += async (s, e) => await AktualizujKomponenty_Click();
+        MiSprawdzAktualizacje.Click += async (s, e) => await CheckForAppUpdate(silent: false);
         MiInformacje.Click += async (s, e) => await Informacje_Click();
 
         MiThemeLight.Click += (s, e) => SetTheme("Light");
@@ -153,6 +159,12 @@ public partial class MainWindow : Window
         LblStatus.Text = message;
     }
 
+    private void SetBusy(bool busy)
+    {
+        BtnDownload.IsEnabled = !busy;
+        MiSprawdzAktualizacje.IsEnabled = !busy;
+    }
+
     // ---- Dependency management ----
 
     private async void CheckAndDownloadComponents()
@@ -181,6 +193,16 @@ public partial class MainWindow : Window
         // those copies only once working replacements exist in the data directory.
         if (File.Exists(ytDlpPath) && Directory.Exists(ffmpegBinPath) && !string.IsNullOrEmpty(GetRuntimePath()))
             AppPaths.CleanupLegacyFiles(appDirectory, dataDirectory);
+
+        // async void caller: nothing may escape from here, and the startup check
+        // must never bother the user with errors (offline, API rate limit).
+        try
+        {
+            await CheckForAppUpdate(silent: true);
+        }
+        catch (Exception)
+        {
+        }
     }
 
     private bool IsRuntimeInPath() => !string.IsNullOrEmpty(FindSystemDeno());
@@ -699,7 +721,7 @@ public partial class MainWindow : Window
 
         if (confirmed)
         {
-            BtnDownload.IsEnabled = false;
+            SetBusy(true);
 
             UpdateStatus("Aktualizacja yt-dlp...");
             if (File.Exists(ytDlpPath))
@@ -731,7 +753,7 @@ public partial class MainWindow : Window
             await CheckAndUpdateDeno();
             await CheckAndUpdateFFmpeg();
             UpdateStatus("Aktualizacja zakonczena");
-            BtnDownload.IsEnabled = true;
+            SetBusy(false);
         }
     }
 
@@ -915,7 +937,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        BtnDownload.IsEnabled = false;
+        SetBusy(true);
         SetUrlRowsEnabled(false);
 
         int successCount = 0;
@@ -933,7 +955,7 @@ public partial class MainWindow : Window
                 successCount++;
         }
 
-        BtnDownload.IsEnabled = true;
+        SetBusy(false);
         SetUrlRowsEnabled(true);
         ProgressBarDownload.Value = 0;
 
@@ -1031,6 +1053,161 @@ public partial class MainWindow : Window
             UpdateStatus(statusPrefix + "Blad");
             await MessageDialog.ShowAsync(this, "Blad (" + rawUrl + "): " + ex.Message, "Blad");
             return false;
+        }
+    }
+
+    // ---- App self-update ----
+
+    private async Task CheckForAppUpdate(bool silent)
+    {
+        const string title = "Aktualizacja aplikacji";
+
+        if (AppPaths.IsSnap)
+        {
+            if (!silent)
+                await MessageDialog.ShowAsync(this, "Aktualizacje tej wersji dostarcza Snap Store.", title);
+            return;
+        }
+
+        int? localBuild = AppUpdater.GetLocalBuildNumber();
+        if (localBuild == null)
+        {
+            if (!silent)
+                await MessageDialog.ShowAsync(this, "Wersja zbudowana lokalnie - aktualizacje aplikacji sa wylaczone.", title);
+            return;
+        }
+
+        if (!BtnDownload.IsEnabled)
+            return;
+
+        ReleaseInfo release;
+        try
+        {
+            release = await AppUpdater.GetLatestReleaseAsync(httpClient);
+        }
+        catch (Exception ex)
+        {
+            if (!silent)
+                await MessageDialog.ShowAsync(this, "Nie udalo sie sprawdzic aktualizacji: " + ex.Message, "Blad");
+            return;
+        }
+
+        if (release.BuildNumber == null || release.BuildNumber <= localBuild)
+        {
+            if (!silent)
+                await MessageDialog.ShowAsync(this, $"Masz najnowsza wersje aplikacji (build {localBuild}).", title);
+            return;
+        }
+
+        if (release.Asset == null)
+        {
+            if (!silent)
+                await MessageDialog.ShowAsync(this, "Nowa wersja jest w trakcie publikacji. Sprobuj za kilka minut.", title);
+            return;
+        }
+
+        // The user may have started a download while GitHub was being queried.
+        if (!BtnDownload.IsEnabled)
+            return;
+
+        bool confirmed = await MessageDialog.ShowConfirmAsync(this,
+            $"Dostepna jest nowa wersja aplikacji (build {release.BuildNumber}, obecna: {localBuild}). " +
+            "Zaktualizowac teraz? Aplikacja uruchomi sie ponownie.",
+            title);
+        if (!confirmed)
+            return;
+
+        if (!AppUpdater.CanWriteDirectory(appDirectory))
+        {
+            bool openPage = await MessageDialog.ShowConfirmAsync(this,
+                "Brak uprawnien do zapisu w folderze aplikacji (" + appDirectory + "). " +
+                "Otworzyc strone nowej wersji, aby pobrac ja recznie?",
+                title);
+            if (openPage)
+                await OpenUrl(release.HtmlUrl);
+            return;
+        }
+
+        await InstallAppUpdate(release, release.Asset);
+    }
+
+    private async Task InstallAppUpdate(ReleaseInfo release, ReleaseAsset asset)
+    {
+        string? exePath = Environment.ProcessPath;
+        if (string.IsNullOrEmpty(exePath))
+        {
+            await MessageDialog.ShowAsync(this, "Nie mozna ustalic sciezki aplikacji.", "Blad");
+            return;
+        }
+
+        string downloadPath = OperatingSystem.IsMacOS()
+            ? Path.Combine(appDirectory, AppUpdater.UpdateZipName)
+            : exePath + AppUpdater.NewSuffix;
+
+        SetBusy(true);
+        try
+        {
+            UpdateStatus($"Pobieranie nowej wersji aplikacji (build {release.BuildNumber})...");
+            await DownloadFileWithProgress(asset.DownloadUrl, downloadPath);
+
+            if (!AppUpdater.VerifyDownload(downloadPath, asset))
+                throw new InvalidDataException("Pobrany plik jest niekompletny lub uszkodzony");
+
+            List<(string Source, string Target)> files;
+            if (OperatingSystem.IsMacOS())
+            {
+                // macOS ships the whole publish folder (not single-file), zipped.
+                string extractDirectory = Path.Combine(appDirectory, AppUpdater.UpdateDirectoryName);
+                AppPaths.TryDeleteDirectory(extractDirectory);
+                ZipFile.ExtractToDirectory(downloadPath, extractDirectory);
+                files = AppUpdater.BuildFileList(extractDirectory, appDirectory);
+            }
+            else
+            {
+                files = new List<(string Source, string Target)> { (downloadPath, exePath) };
+            }
+
+            UpdateStatus("Instalowanie nowej wersji aplikacji...");
+            AppUpdater.ApplyUpdate(files);
+        }
+        catch (Exception ex)
+        {
+            AppUpdater.DeleteUpdateDownloads(appDirectory, exePath);
+            SetBusy(false);
+            UpdateStatus("Blad aktualizacji aplikacji: " + ex.Message);
+            await MessageDialog.ShowAsync(this, "Nie udalo sie zaktualizowac aplikacji: " + ex.Message, "Blad");
+            return;
+        }
+
+        AppUpdater.DeleteUpdateDownloads(appDirectory, exePath);
+        UpdateStatus("Aplikacja zaktualizowana. Ponowne uruchamianie...");
+
+        try
+        {
+            AppUpdater.Relaunch(exePath);
+        }
+        catch (Exception ex)
+        {
+            await MessageDialog.ShowAsync(this,
+                "Aplikacja zostala zaktualizowana. Uruchom ja ponownie recznie. (" + ex.Message + ")",
+                "Aktualizacja aplikacji");
+        }
+
+        if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            desktop.Shutdown();
+        else
+            Close();
+    }
+
+    private async Task OpenUrl(string url)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+        }
+        catch (Exception ex)
+        {
+            await MessageDialog.ShowAsync(this, "Nie mozna otworzyc linku: " + ex.Message, "Blad");
         }
     }
 

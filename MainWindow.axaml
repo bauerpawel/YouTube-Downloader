@@ -11,6 +11,7 @@
     <Menu DockPanel.Dock="Top">
       <MenuItem Header="_Narzedzia">
         <MenuItem Name="MiAktualizujKomponenty" Header="_Aktualizuj komponenty"/>
+        <MenuItem Name="MiSprawdzAktualizacje" Header="_Sprawdz aktualizacje aplikacji"/>
       </MenuItem>
       <MenuItem Header="_Widok">
         <MenuItem Name="MiThemeLight" Header="_Jasny" ToggleType="Radio" GroupName="ThemeGroup"/>
