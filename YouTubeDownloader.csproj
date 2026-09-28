@@ -27,6 +27,13 @@
     <AvaloniaResource Include="Assets\app-logo.png" />
   </ItemGroup>
 
+  <!-- CI passes -p:BuildNumber=<github.run_number>; the self-updater compares it
+       with the number in the latest release tag (v<Version>-<run_number>). Local
+       builds have none, which turns self-update off for them. -->
+  <ItemGroup Condition="'$(BuildNumber)' != ''">
+    <AssemblyMetadata Include="BuildNumber" Value="$(BuildNumber)" />
+  </ItemGroup>
+
   <Target Name="StripNativePdbs" AfterTargets="ComputeFilesToPublish">
     <ItemGroup>
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Extension)' == '.pdb'" />

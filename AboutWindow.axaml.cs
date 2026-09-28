@@ -21,9 +21,11 @@ public partial class AboutWindow : Window
 
     private static string GetAppVersion()
     {
-        return Assembly.GetExecutingAssembly()
+        string version = Assembly.GetExecutingAssembly()
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? "?";
+        int? build = AppUpdater.GetLocalBuildNumber();
+        return build == null ? version : $"{version} (build {build})";
     }
 
     private async Task OpenUrl(string url)
