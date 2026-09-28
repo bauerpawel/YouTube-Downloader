@@ -1,3 +1,4 @@
+using System.Globalization;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
@@ -15,7 +16,10 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            RequestedThemeVariant = ThemeSettings.ToVariant(ThemeSettings.Load(AppPaths.DataDirectory));
+            string dataDirectory = AppPaths.DataDirectory;
+            RequestedThemeVariant = ThemeSettings.ToVariant(ThemeSettings.Load(dataDirectory));
+            Strings.Current = Strings.For(
+                LanguageSettings.Resolve(LanguageSettings.Load(dataDirectory), CultureInfo.CurrentUICulture));
 
             desktop.MainWindow = new MainWindow();
         }

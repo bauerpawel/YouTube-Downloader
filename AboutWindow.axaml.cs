@@ -12,7 +12,13 @@ public partial class AboutWindow : Window
     {
         InitializeComponent();
 
-        VersionText.Text = "Wersja " + GetAppVersion();
+        Strings ui = Strings.Current;
+        Title = ui.TitleAbout;
+        VersionText.Text = ui.AboutVersion(GetAppVersion());
+        LblLicense.Text = ui.AboutLicense;
+        LblRepository.Text = ui.AboutRepository;
+        LblAuthor.Text = ui.AboutAuthor;
+        CloseButton.Content = ui.ButtonClose;
 
         RepoLink.PointerPressed += async (s, e) => await OpenUrl("https://github.com/bauerpawel/YouTube-Downloader");
         AuthorLink.PointerPressed += async (s, e) => await OpenUrl("https://bauer.net.pl");
@@ -36,7 +42,7 @@ public partial class AboutWindow : Window
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Nie mozna otworzyc linku: " + ex.Message, "Blad");
+            await MessageDialog.ShowAsync(this, Strings.Current.ErrorCannotOpenLink(ex.Message), Strings.Current.TitleError);
         }
     }
 }

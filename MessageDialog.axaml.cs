@@ -20,11 +20,9 @@ public partial class MessageDialog : Window
         Title = title;
         MessageText.Text = message;
 
-        if (isConfirmation)
-        {
-            OkButton.Content = "Tak";
-            CancelButton.IsVisible = true;
-        }
+        OkButton.Content = isConfirmation ? Strings.Current.ButtonYes : Strings.Current.ButtonOk;
+        CancelButton.Content = Strings.Current.ButtonNo;
+        CancelButton.IsVisible = isConfirmation;
 
         OkButton.Click += (s, e) => { confirmed = true; Close(); };
         CancelButton.Click += (s, e) => { confirmed = false; Close(); };

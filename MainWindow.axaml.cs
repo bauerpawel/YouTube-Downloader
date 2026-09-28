@@ -32,6 +32,8 @@ public partial class MainWindow : Window
     private readonly string denoVersionPath;
     private readonly string nodeJsPath;
 
+    private static Strings Ui => Strings.Current;
+
     public MainWindow()
     {
         httpClient = new HttpClient();
@@ -57,19 +59,15 @@ public partial class MainWindow : Window
 
         InitializeComponent();
 
-        CbContentType.Items.Add("Wideo + Audio");
-        CbContentType.Items.Add("Tylko Audio (MP3)");
-        CbContentType.SelectedIndex = 0;
         CbContentType.SelectionChanged += ContentType_Changed;
-
-        foreach (int? height in YtDlpArguments.QualityHeights)
-            CbQuality.Items.Add(YtDlpArguments.QualityLabel(height, "Najlepsza"));
-        CbQuality.SelectedIndex = 0;
 
         CbFormat.Items.Add("mp4");
         CbFormat.Items.Add("webm");
         CbFormat.Items.Add("mkv");
         CbFormat.SelectedIndex = 0;
+
+        ApplyTexts();
+        LblStatus.Text = Ui.StatusReady;
 
         BtnAddUrl.Click += BtnAddUrl_Click;
         BtnDownload.Click += async (s, e) => await BtnDownload_Click();
@@ -80,6 +78,8 @@ public partial class MainWindow : Window
         MiThemeLight.Click += (s, e) => SetTheme("Light");
         MiThemeDark.Click += (s, e) => SetTheme("Dark");
         MiThemeSystem.Click += (s, e) => SetTheme("Default");
+        MiLangPolish.Click += (s, e) => SetLanguage(LanguageSettings.Polish);
+        MiLangEnglish.Click += (s, e) => SetLanguage(LanguageSettings.English);
 
         string currentTheme = ThemeSettings.Load(dataDirectory);
         MiThemeLight.IsChecked = currentTheme == "Light";
@@ -93,6 +93,52 @@ public partial class MainWindow : Window
     {
         Application.Current!.RequestedThemeVariant = ThemeSettings.ToVariant(name);
         ThemeSettings.Save(dataDirectory, name);
+    }
+
+    private void SetLanguage(string code)
+    {
+        Strings.Current = Strings.For(code);
+        LanguageSettings.Save(dataDirectory, code);
+        ApplyTexts();
+    }
+
+    // Every text of this window from Strings.Current. Runs at startup and on each
+    // language switch; list selections and extra URL rows survive. The status line
+    // is left alone - it keeps its language until the next status update.
+    private void ApplyTexts()
+    {
+        MiTools.Header = Ui.MenuTools;
+        MiAktualizujKomponenty.Header = Ui.MenuUpdateComponents;
+        MiSprawdzAktualizacje.Header = Ui.MenuCheckAppUpdate;
+        MiView.Header = Ui.MenuView;
+        MiThemeLight.Header = Ui.MenuThemeLight;
+        MiThemeDark.Header = Ui.MenuThemeDark;
+        MiThemeSystem.Header = Ui.MenuThemeSystem;
+        MiLanguage.Header = Ui.MenuLanguage;
+        MiHelp.Header = Ui.MenuHelp;
+        MiInformacje.Header = Ui.MenuAbout;
+        MiLangPolish.IsChecked = Ui == Strings.Polish;
+        MiLangEnglish.IsChecked = Ui == Strings.English;
+
+        LblUrl.Text = Ui.LabelUrl;
+        LblContentType.Text = Ui.LabelContentType;
+        LblQuality.Text = Ui.LabelQuality;
+        LblFormat.Text = Ui.LabelFormat;
+        BtnDownload.Content = Ui.ButtonDownload;
+        foreach (var box in extraUrlBoxes)
+            box.PlaceholderText = Ui.PlaceholderExtraUrl;
+
+        int contentTypeIndex = Math.Max(CbContentType.SelectedIndex, 0);
+        CbContentType.Items.Clear();
+        CbContentType.Items.Add(Ui.ContentTypeVideoAudio);
+        CbContentType.Items.Add(Ui.ContentTypeAudioOnly);
+        CbContentType.SelectedIndex = contentTypeIndex;
+
+        int qualityIndex = Math.Max(CbQuality.SelectedIndex, 0);
+        CbQuality.Items.Clear();
+        foreach (int? height in YtDlpArguments.QualityHeights)
+            CbQuality.Items.Add(YtDlpArguments.QualityLabel(height, Ui.QualityBest));
+        CbQuality.SelectedIndex = qualityIndex;
     }
 
     protected override void OnClosed(EventArgs e)
@@ -110,7 +156,7 @@ public partial class MainWindow : Window
 
     private void BtnAddUrl_Click(object? sender, RoutedEventArgs e)
     {
-        var newUrlBox = new TextBox { PlaceholderText = "Wklej kolejny link do filmu..." };
+        var newUrlBox = new TextBox { PlaceholderText = Ui.PlaceholderExtraUrl };
         var removeBtn = new Button { Content = "-", Width = 40 };
 
         var row = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto") };
@@ -172,7 +218,7 @@ public partial class MainWindow : Window
     private async void CheckAndDownloadComponents()
     {
         SetBusy(true);
-        UpdateStatus("Sprawdzanie komponentow...");
+        UpdateStatus(Ui.StatusCheckingComponents);
 
         bool hasRuntime = File.Exists(denoPath) || File.Exists(nodeJsPath) || IsRuntimeInPath();
         if (!hasRuntime)
@@ -180,17 +226,17 @@ public partial class MainWindow : Window
 
         if (!File.Exists(ytDlpPath))
         {
-            UpdateStatus("Pobieranie yt-dlp...");
+            UpdateStatus(Ui.StatusDownloadingYtDlp);
             await DownloadYtDlp();
         }
 
         if (!Directory.Exists(ffmpegBinPath))
         {
-            UpdateStatus("Pobieranie FFmpeg...");
+            UpdateStatus(Ui.StatusDownloadingFFmpeg);
             await DownloadFFmpeg();
         }
 
-        UpdateStatus("Wszystkie komponenty sa dostepne. Gotowy do pobierania.");
+        UpdateStatus(Ui.StatusAllComponentsReady);
 
         // Versions before the data directory kept the tools next to the exe. Remove
         // those copies only once working replacements exist in the data directory.
@@ -297,7 +343,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Blad pobierania informacji Deno: " + ex.Message, "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorDenoInfo(ex.Message), Ui.TitleError);
             return ("", "");
         }
     }
@@ -306,20 +352,20 @@ public partial class MainWindow : Window
     {
         try
         {
-            UpdateStatus("Pobieranie Deno runtime...");
+            UpdateStatus(Ui.StatusDownloadingDeno);
 
             var (downloadUrl, version) = await GetLatestDenoInfo();
 
             if (string.IsNullOrEmpty(downloadUrl))
             {
-                await MessageDialog.ShowAsync(this, "Nie znaleziono Deno dla tego systemu", "Blad");
+                await MessageDialog.ShowAsync(this, Ui.ErrorDenoNotFound, Ui.TitleError);
                 return;
             }
 
             string zipPath = Path.Combine(dataDirectory, "deno.zip");
             await DownloadFileWithProgress(downloadUrl, zipPath);
 
-            UpdateStatus("Rozpakowywanie Deno...");
+            UpdateStatus(Ui.StatusExtractingDeno);
 
             string denoEntryName = OperatingSystem.IsWindows() ? "deno.exe" : "deno";
             using (ZipArchive archive = ZipFile.OpenRead(zipPath))
@@ -336,12 +382,12 @@ public partial class MainWindow : Window
             if (!string.IsNullOrEmpty(version))
                 await File.WriteAllTextAsync(denoVersionPath, version);
 
-            UpdateStatus("Deno zainstalowane");
+            UpdateStatus(Ui.StatusDenoInstalled);
         }
         catch (Exception ex)
         {
-            UpdateStatus("Blad Deno: " + ex.Message);
-            await MessageDialog.ShowAsync(this, "Nie udalo sie pobrac Deno. Zainstaluj z https://deno.com", "Ostrzezenie");
+            UpdateStatus(Ui.StatusDenoError(ex.Message));
+            await MessageDialog.ShowAsync(this, Ui.WarningDenoFailed, Ui.TitleWarning);
         }
     }
 
@@ -367,11 +413,11 @@ public partial class MainWindow : Window
             string url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/" + GetYtDlpAssetName();
             await DownloadFileWithProgress(url, ytDlpPath);
             AppPaths.MakeExecutable(ytDlpPath);
-            UpdateStatus("yt-dlp pobrane");
+            UpdateStatus(Ui.StatusYtDlpDownloaded);
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Blad pobierania yt-dlp: " + ex.Message, "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorYtDlpDownload(ex.Message), Ui.TitleError);
         }
     }
 
@@ -433,7 +479,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Blad pobierania FFmpeg info: " + ex.Message, "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpegInfo(ex.Message), Ui.TitleError);
             return ("", "");
         }
     }
@@ -475,7 +521,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Blad pobierania informacji FFmpeg: " + ex.Message, "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpegInfo(ex.Message), Ui.TitleError);
             return ("", "", "");
         }
     }
@@ -503,13 +549,13 @@ public partial class MainWindow : Window
 
         using var process = Process.Start(processInfo);
         if (process == null)
-            throw new Exception("Nie udalo sie uruchomic tar");
+            throw new Exception(Ui.ErrorTarStart);
 
         await process.WaitForExitAsync();
         if (process.ExitCode != 0)
         {
             string error = await process.StandardError.ReadToEndAsync();
-            throw new Exception("tar zakonczyl sie bledem: " + error);
+            throw new Exception(Ui.ErrorTarFailed(error));
         }
     }
 
@@ -523,19 +569,19 @@ public partial class MainWindow : Window
 
         try
         {
-            UpdateStatus("Pobieranie informacji FFmpeg...");
+            UpdateStatus(Ui.StatusFetchingFFmpegInfo);
             var (downloadUrl, version) = await GetLatestFFmpegInfo();
 
             if (string.IsNullOrEmpty(downloadUrl))
-                throw new Exception("Nie znaleziono linku do FFmpeg");
+                throw new Exception(Ui.ErrorFFmpegLinkNotFound);
 
-            UpdateStatus("Pobieranie FFmpeg (" + version + ")...");
+            UpdateStatus(Ui.StatusDownloadingFFmpegVersion(version));
             string archiveExtension = OperatingSystem.IsWindows() ? ".zip" : ".tar.xz";
             string archivePath = Path.Combine(dataDirectory, "ffmpeg" + archiveExtension);
 
             await DownloadFileWithProgress(downloadUrl, archivePath);
 
-            UpdateStatus("Rozpakowywanie FFmpeg...");
+            UpdateStatus(Ui.StatusExtractingFFmpeg);
 
             if (Directory.Exists(ffmpegBinPath))
                 Directory.Delete(ffmpegBinPath, true);
@@ -549,7 +595,7 @@ public partial class MainWindow : Window
             string[] binPaths = Directory.GetDirectories(tempExtractPath, "bin", SearchOption.AllDirectories);
 
             if (binPaths.Length == 0)
-                throw new Exception("Nie znaleziono folderu bin");
+                throw new Exception(Ui.ErrorFFmpegBinNotFound);
 
             string sourceBinPath = binPaths[0];
             Directory.CreateDirectory(ffmpegBinPath);
@@ -567,12 +613,12 @@ public partial class MainWindow : Window
             File.Delete(archivePath);
             Directory.Delete(tempExtractPath, true);
 
-            UpdateStatus("FFmpeg pobrane. Wersja: " + version);
+            UpdateStatus(Ui.StatusFFmpegDownloaded(version));
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Blad FFmpeg: " + ex.Message, "Blad");
-            UpdateStatus("Blad: " + ex.Message);
+            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpeg(ex.Message), Ui.TitleError);
+            UpdateStatus(Ui.ErrorWithDetails(ex.Message));
         }
     }
 
@@ -580,13 +626,13 @@ public partial class MainWindow : Window
     {
         try
         {
-            UpdateStatus("Pobieranie informacji FFmpeg...");
+            UpdateStatus(Ui.StatusFetchingFFmpegInfo);
             var (ffmpegUrl, ffprobeUrl, version) = await GetLatestFFmpegInfoMac();
 
             if (string.IsNullOrEmpty(ffmpegUrl) || string.IsNullOrEmpty(ffprobeUrl))
-                throw new Exception("Nie znaleziono linku do FFmpeg");
+                throw new Exception(Ui.ErrorFFmpegLinkNotFound);
 
-            UpdateStatus("Pobieranie FFmpeg (" + version + ")...");
+            UpdateStatus(Ui.StatusDownloadingFFmpegVersion(version));
 
             if (Directory.Exists(ffmpegBinPath))
                 Directory.Delete(ffmpegBinPath, true);
@@ -603,7 +649,7 @@ public partial class MainWindow : Window
 
             await File.WriteAllTextAsync(ffmpegVersionPath, version);
 
-            UpdateStatus("FFmpeg pobrane. Wersja: " + version);
+            UpdateStatus(Ui.StatusFFmpegDownloaded(version));
         }
         catch (Exception ex)
         {
@@ -613,8 +659,8 @@ public partial class MainWindow : Window
             if (Directory.Exists(ffmpegBinPath))
                 Directory.Delete(ffmpegBinPath, true);
 
-            await MessageDialog.ShowAsync(this, "Blad FFmpeg: " + ex.Message, "Blad");
-            UpdateStatus("Blad: " + ex.Message);
+            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpeg(ex.Message), Ui.TitleError);
+            UpdateStatus(Ui.ErrorWithDetails(ex.Message));
         }
     }
 
@@ -655,11 +701,11 @@ public partial class MainWindow : Window
         {
             if (!File.Exists(denoPath))
             {
-                UpdateStatus("Deno: pomijanie (uzywany runtime systemowy)");
+                UpdateStatus(Ui.StatusDenoSkipped);
                 return;
             }
 
-            UpdateStatus("Sprawdzanie wersji Deno...");
+            UpdateStatus(Ui.StatusCheckingDenoVersion);
             var (_, latestVersion) = await GetLatestDenoInfo();
 
             if (string.IsNullOrEmpty(latestVersion))
@@ -671,17 +717,17 @@ public partial class MainWindow : Window
 
             if (string.IsNullOrEmpty(currentVersion) || currentVersion != latestVersion)
             {
-                UpdateStatus("Deno: Nowa wersja dostepna");
+                UpdateStatus(Ui.StatusDenoUpdateAvailable);
                 await DownloadDeno();
             }
             else
             {
-                UpdateStatus("Deno: Wersja aktualna");
+                UpdateStatus(Ui.StatusDenoUpToDate);
             }
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Blad aktualizacji Deno: " + ex.Message, "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorDenoUpdate(ex.Message), Ui.TitleError);
         }
     }
 
@@ -702,7 +748,7 @@ public partial class MainWindow : Window
 
             if (string.IsNullOrEmpty(currentVersion) || currentVersion != latestVersion)
             {
-                UpdateStatus("FFmpeg: Nowa wersja dostepna");
+                UpdateStatus(Ui.StatusFFmpegUpdateAvailable);
 
                 if (Directory.Exists(ffmpegBinPath))
                     Directory.Delete(ffmpegBinPath, true);
@@ -711,24 +757,24 @@ public partial class MainWindow : Window
             }
             else
             {
-                UpdateStatus("FFmpeg: Wersja aktualna");
+                UpdateStatus(Ui.StatusFFmpegUpToDate);
             }
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Blad aktualizacji: " + ex.Message, "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorUpdate(ex.Message), Ui.TitleError);
         }
     }
 
     private async Task AktualizujKomponenty_Click()
     {
-        bool confirmed = await MessageDialog.ShowConfirmAsync(this, "Zaktualizowac komponenty?", "Aktualizacja");
+        bool confirmed = await MessageDialog.ShowConfirmAsync(this, Ui.ConfirmUpdateComponents, Ui.TitleComponentsUpdate);
 
         if (confirmed)
         {
             SetBusy(true);
 
-            UpdateStatus("Aktualizacja yt-dlp...");
+            UpdateStatus(Ui.StatusUpdatingYtDlp);
             if (File.Exists(ytDlpPath))
             {
                 try
@@ -747,17 +793,17 @@ public partial class MainWindow : Window
                         if (process != null)
                             await process.WaitForExitAsync();
                     }
-                    UpdateStatus("yt-dlp zaktualizowane");
+                    UpdateStatus(Ui.StatusYtDlpUpdated);
                 }
                 catch (Exception ex)
                 {
-                    await MessageDialog.ShowAsync(this, "Blad: " + ex.Message, "Blad");
+                    await MessageDialog.ShowAsync(this, Ui.ErrorWithDetails(ex.Message), Ui.TitleError);
                 }
             }
 
             await CheckAndUpdateDeno();
             await CheckAndUpdateFFmpeg();
-            UpdateStatus("Aktualizacja zakonczena");
+            UpdateStatus(Ui.StatusComponentsUpdateDone);
             SetBusy(false);
         }
     }
@@ -791,7 +837,7 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(url))
         {
-            UpdateStatus("Blad: URL nie moze byc pusty");
+            UpdateStatus(Ui.StatusUrlEmpty);
             return false;
         }
 
@@ -799,14 +845,14 @@ public partial class MainWindow : Window
 
         if (!normalizedUrl.Contains("youtube.com") && !normalizedUrl.Contains("youtu.be"))
         {
-            UpdateStatus("Blad: Tylko linki YouTube");
+            UpdateStatus(Ui.StatusYouTubeOnly);
             return false;
         }
 
         if (!Uri.TryCreate(normalizedUrl, UriKind.Absolute, out var uriResult) ||
             (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps))
         {
-            UpdateStatus("Blad: Nieprawidlowy URL");
+            UpdateStatus(Ui.StatusInvalidUrl);
             return false;
         }
 
@@ -852,11 +898,11 @@ public partial class MainWindow : Window
             Match etaMatch = etaRegex.Match(line);
             string eta = etaMatch.Success ? etaMatch.Groups[1].Value : "";
 
-            string status = "Pobieranie: " + percent.ToString("F1") + "%";
+            string status = Ui.ProgressDownloading + ": " + percent.ToString("F1") + "%";
             if (!string.IsNullOrEmpty(downloadedSize))
-                status += " Rozmiar: " + downloadedSize;
+                status += " " + Ui.ProgressSize + ": " + downloadedSize;
             if (!string.IsNullOrEmpty(speed))
-                status += " Predkosc: " + speed;
+                status += " " + Ui.ProgressSpeed + ": " + speed;
             if (!string.IsNullOrEmpty(eta))
                 status += " ETA: " + eta;
 
@@ -871,7 +917,7 @@ public partial class MainWindow : Window
 
         if (rawUrls.Count == 0)
         {
-            await MessageDialog.ShowAsync(this, "Podaj przynajmniej jeden link", "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorNoUrl, Ui.TitleError);
             return;
         }
 
@@ -879,27 +925,27 @@ public partial class MainWindow : Window
         {
             if (!ValidateUrl(url))
             {
-                await MessageDialog.ShowAsync(this, "Nieprawidlowy link: " + url, "Blad");
+                await MessageDialog.ShowAsync(this, Ui.ErrorInvalidLink(url), Ui.TitleError);
                 return;
             }
         }
 
         if (!File.Exists(ytDlpPath))
         {
-            await MessageDialog.ShowAsync(this, "yt-dlp niedostepne", "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorYtDlpUnavailable, Ui.TitleError);
             return;
         }
 
         if (!Directory.Exists(ffmpegBinPath))
         {
-            await MessageDialog.ShowAsync(this, "FFmpeg niedostepne", "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpegUnavailable, Ui.TitleError);
             return;
         }
 
         string runtimePath = GetRuntimePath();
         if (string.IsNullOrEmpty(runtimePath))
         {
-            await MessageDialog.ShowAsync(this, "Brak runtime Deno/Node.js", "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorNoJsRuntime, Ui.TitleError);
             return;
         }
 
@@ -914,7 +960,7 @@ public partial class MainWindow : Window
             ProgressBarDownload.Value = 0;
 
             string statusPrefix = rawUrls.Count > 1 ? $"[{i + 1}/{rawUrls.Count}] " : "";
-            UpdateStatus(statusPrefix + "Przygotowanie...");
+            UpdateStatus(statusPrefix + Ui.StatusPreparing);
 
             bool success = await DownloadSingleUrlAsync(rawUrls[i], runtimePath, statusPrefix);
             if (success)
@@ -927,14 +973,13 @@ public partial class MainWindow : Window
 
         if (successCount == rawUrls.Count)
         {
-            string message = rawUrls.Count > 1 ? "Wszystkie pliki pobrane" : "Plik pobrany";
-            UpdateStatus("Pobieranie zakonczono!");
-            await MessageDialog.ShowAsync(this, message + ". Lokalizacja: " + downloadsDir, "Sukces");
+            UpdateStatus(Ui.StatusDownloadFinished);
+            await MessageDialog.ShowAsync(this, Ui.MessageDownloaded(rawUrls.Count > 1, downloadsDir), Ui.TitleSuccess);
         }
         else
         {
-            UpdateStatus($"Zakonczono: {successCount}/{rawUrls.Count} pobranych");
-            await MessageDialog.ShowAsync(this, $"Pobrano {successCount} z {rawUrls.Count} plikow.", "Zakonczono z bledami");
+            UpdateStatus(Ui.StatusFinishedCount(successCount, rawUrls.Count));
+            await MessageDialog.ShowAsync(this, Ui.MessageDownloadedCount(successCount, rawUrls.Count), Ui.TitleFinishedWithErrors);
         }
     }
 
@@ -1003,21 +1048,21 @@ public partial class MainWindow : Window
             if (process.ExitCode == 0)
             {
                 ProgressBarDownload.Value = 100;
-                UpdateStatus(statusPrefix + "Pobrano");
+                UpdateStatus(statusPrefix + Ui.StatusDownloaded);
                 return true;
             }
             else
             {
                 string error = await process.StandardError.ReadToEndAsync();
-                UpdateStatus(statusPrefix + "Blad pobierania");
-                await MessageDialog.ShowAsync(this, "Blad (" + rawUrl + "): " + error, "Blad");
+                UpdateStatus(statusPrefix + Ui.StatusDownloadError);
+                await MessageDialog.ShowAsync(this, Ui.ErrorDownloadFailed(rawUrl, error), Ui.TitleError);
                 return false;
             }
         }
         catch (Exception ex)
         {
-            UpdateStatus(statusPrefix + "Blad");
-            await MessageDialog.ShowAsync(this, "Blad (" + rawUrl + "): " + ex.Message, "Blad");
+            UpdateStatus(statusPrefix + Ui.StatusFailed);
+            await MessageDialog.ShowAsync(this, Ui.ErrorDownloadFailed(rawUrl, ex.Message), Ui.TitleError);
             return false;
         }
     }
@@ -1026,12 +1071,12 @@ public partial class MainWindow : Window
 
     private async Task CheckForAppUpdate(bool silent)
     {
-        const string title = "Aktualizacja aplikacji";
+        string title = Ui.TitleAppUpdate;
 
         if (AppPaths.IsSnap)
         {
             if (!silent)
-                await MessageDialog.ShowAsync(this, "Aktualizacje tej wersji dostarcza Snap Store.", title);
+                await MessageDialog.ShowAsync(this, Ui.AppUpdateSnap, title);
             return;
         }
 
@@ -1039,7 +1084,7 @@ public partial class MainWindow : Window
         if (localBuild == null)
         {
             if (!silent)
-                await MessageDialog.ShowAsync(this, "Wersja zbudowana lokalnie - aktualizacje aplikacji sa wylaczone.", title);
+                await MessageDialog.ShowAsync(this, Ui.AppUpdateLocalBuild, title);
             return;
         }
 
@@ -1054,21 +1099,21 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             if (!silent)
-                await MessageDialog.ShowAsync(this, "Nie udalo sie sprawdzic aktualizacji: " + ex.Message, "Blad");
+                await MessageDialog.ShowAsync(this, Ui.ErrorAppUpdateCheck(ex.Message), Ui.TitleError);
             return;
         }
 
         if (release.BuildNumber == null || release.BuildNumber <= localBuild)
         {
             if (!silent)
-                await MessageDialog.ShowAsync(this, $"Masz najnowsza wersje aplikacji (build {localBuild}).", title);
+                await MessageDialog.ShowAsync(this, Ui.AppUpToDate(localBuild.Value), title);
             return;
         }
 
         if (release.Asset == null)
         {
             if (!silent)
-                await MessageDialog.ShowAsync(this, "Nowa wersja jest w trakcie publikacji. Sprobuj za kilka minut.", title);
+                await MessageDialog.ShowAsync(this, Ui.AppUpdatePublishing, title);
             return;
         }
 
@@ -1077,8 +1122,7 @@ public partial class MainWindow : Window
             return;
 
         bool confirmed = await MessageDialog.ShowConfirmAsync(this,
-            $"Dostepna jest nowa wersja aplikacji (build {release.BuildNumber}, obecna: {localBuild}). " +
-            "Zaktualizowac teraz? Aplikacja uruchomi sie ponownie.",
+            Ui.AppUpdateAvailable(release.BuildNumber.Value, localBuild.Value),
             title);
         if (!confirmed)
             return;
@@ -1086,8 +1130,7 @@ public partial class MainWindow : Window
         if (!AppUpdater.CanWriteDirectory(appDirectory))
         {
             bool openPage = await MessageDialog.ShowConfirmAsync(this,
-                "Brak uprawnien do zapisu w folderze aplikacji (" + appDirectory + "). " +
-                "Otworzyc strone nowej wersji, aby pobrac ja recznie?",
+                Ui.AppUpdateNoWriteAccess(appDirectory),
                 title);
             if (openPage)
                 await OpenUrl(release.HtmlUrl);
@@ -1102,7 +1145,7 @@ public partial class MainWindow : Window
         string? exePath = Environment.ProcessPath;
         if (string.IsNullOrEmpty(exePath))
         {
-            await MessageDialog.ShowAsync(this, "Nie mozna ustalic sciezki aplikacji.", "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorNoAppPath, Ui.TitleError);
             return;
         }
 
@@ -1113,11 +1156,11 @@ public partial class MainWindow : Window
         SetBusy(true);
         try
         {
-            UpdateStatus($"Pobieranie nowej wersji aplikacji (build {release.BuildNumber})...");
+            UpdateStatus(Ui.StatusDownloadingAppUpdate(release.BuildNumber.GetValueOrDefault()));
             await DownloadFileWithProgress(asset.DownloadUrl, downloadPath);
 
             if (!AppUpdater.VerifyDownload(downloadPath, asset))
-                throw new InvalidDataException("Pobrany plik jest niekompletny lub uszkodzony");
+                throw new InvalidDataException(Ui.ErrorDownloadCorrupt);
 
             List<(string Source, string Target)> files;
             if (OperatingSystem.IsMacOS())
@@ -1133,20 +1176,20 @@ public partial class MainWindow : Window
                 files = new List<(string Source, string Target)> { (downloadPath, exePath) };
             }
 
-            UpdateStatus("Instalowanie nowej wersji aplikacji...");
+            UpdateStatus(Ui.StatusInstallingAppUpdate);
             AppUpdater.ApplyUpdate(files);
         }
         catch (Exception ex)
         {
             AppUpdater.DeleteUpdateDownloads(appDirectory, exePath);
             SetBusy(false);
-            UpdateStatus("Blad aktualizacji aplikacji: " + ex.Message);
-            await MessageDialog.ShowAsync(this, "Nie udalo sie zaktualizowac aplikacji: " + ex.Message, "Blad");
+            UpdateStatus(Ui.StatusAppUpdateError(ex.Message));
+            await MessageDialog.ShowAsync(this, Ui.ErrorAppUpdateFailed(ex.Message), Ui.TitleError);
             return;
         }
 
         AppUpdater.DeleteUpdateDownloads(appDirectory, exePath);
-        UpdateStatus("Aplikacja zaktualizowana. Ponowne uruchamianie...");
+        UpdateStatus(Ui.StatusAppUpdatedRestarting);
 
         try
         {
@@ -1155,8 +1198,8 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             await MessageDialog.ShowAsync(this,
-                "Aplikacja zostala zaktualizowana. Uruchom ja ponownie recznie. (" + ex.Message + ")",
-                "Aktualizacja aplikacji");
+                Ui.AppUpdatedRestartManually(ex.Message),
+                Ui.TitleAppUpdate);
         }
 
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -1173,7 +1216,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, "Nie mozna otworzyc linku: " + ex.Message, "Blad");
+            await MessageDialog.ShowAsync(this, Ui.ErrorCannotOpenLink(ex.Message), Ui.TitleError);
         }
     }
 

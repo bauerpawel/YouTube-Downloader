@@ -9,22 +9,27 @@
         Icon="/app.ico">
   <DockPanel>
     <Menu DockPanel.Dock="Top">
-      <MenuItem Header="_Narzedzia">
-        <MenuItem Name="MiAktualizujKomponenty" Header="_Aktualizuj komponenty"/>
-        <MenuItem Name="MiSprawdzAktualizacje" Header="_Sprawdz aktualizacje aplikacji"/>
+      <MenuItem Name="MiTools">
+        <MenuItem Name="MiAktualizujKomponenty"/>
+        <MenuItem Name="MiSprawdzAktualizacje"/>
       </MenuItem>
-      <MenuItem Header="_Widok">
-        <MenuItem Name="MiThemeLight" Header="_Jasny" ToggleType="Radio" GroupName="ThemeGroup"/>
-        <MenuItem Name="MiThemeDark" Header="_Ciemny" ToggleType="Radio" GroupName="ThemeGroup"/>
-        <MenuItem Name="MiThemeSystem" Header="_Systemowy" ToggleType="Radio" GroupName="ThemeGroup"/>
+      <MenuItem Name="MiView">
+        <MenuItem Name="MiThemeLight" ToggleType="Radio" GroupName="ThemeGroup"/>
+        <MenuItem Name="MiThemeDark" ToggleType="Radio" GroupName="ThemeGroup"/>
+        <MenuItem Name="MiThemeSystem" ToggleType="Radio" GroupName="ThemeGroup"/>
+        <Separator/>
+        <MenuItem Name="MiLanguage">
+          <MenuItem Name="MiLangPolish" Header="Polski" ToggleType="Radio" GroupName="LanguageGroup"/>
+          <MenuItem Name="MiLangEnglish" Header="English" ToggleType="Radio" GroupName="LanguageGroup"/>
+        </MenuItem>
       </MenuItem>
-      <MenuItem Header="_Pomoc">
-        <MenuItem Name="MiInformacje" Header="_Informacje"/>
+      <MenuItem Name="MiHelp">
+        <MenuItem Name="MiInformacje"/>
       </MenuItem>
     </Menu>
 
     <StackPanel Margin="20" Spacing="10">
-      <TextBlock Text="Link do filmu:"/>
+      <TextBlock Name="LblUrl"/>
 
       <Grid ColumnDefinitions="*,Auto">
         <TextBox Name="TxtUrl" Grid.Column="0" Margin="0,0,10,0"
@@ -36,25 +41,25 @@
 
       <Grid ColumnDefinitions="150,150,150,*,100" Margin="0,10,0,0">
         <StackPanel Grid.Column="0">
-          <TextBlock Text="Typ:"/>
+          <TextBlock Name="LblContentType"/>
           <ComboBox Name="CbContentType" HorizontalAlignment="Stretch"/>
         </StackPanel>
         <StackPanel Grid.Column="1" Margin="10,0,0,0">
-          <TextBlock Text="Jakosc:"/>
+          <TextBlock Name="LblQuality"/>
           <ComboBox Name="CbQuality" HorizontalAlignment="Stretch"/>
         </StackPanel>
         <StackPanel Grid.Column="2" Margin="10,0,0,0">
-          <TextBlock Text="Format:"/>
+          <TextBlock Name="LblFormat"/>
           <ComboBox Name="CbFormat" HorizontalAlignment="Stretch"/>
         </StackPanel>
-        <Button Name="BtnDownload" Grid.Column="4" Content="Pobierz"
+        <Button Name="BtnDownload" Grid.Column="4"
                 Height="30" VerticalAlignment="Bottom" HorizontalAlignment="Stretch"/>
       </Grid>
 
       <ProgressBar Name="ProgressBarDownload" Minimum="0" Maximum="100" Height="30"/>
 
       <Border BorderBrush="Gray" BorderThickness="1" Height="250">
-        <TextBlock Name="LblStatus" Text="Gotowy do pobierania"
+        <TextBlock Name="LblStatus"
                     FontFamily="Courier New, monospace" Padding="5" TextWrapping="Wrap"/>
       </Border>
     </StackPanel>

@@ -14,8 +14,8 @@
       </ScrollViewer>
     </StackPanel>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-      <Button Name="OkButton" Content="OK" Width="80"/>
-      <Button Name="CancelButton" Content="Nie" Width="80" IsVisible="False"/>
+      <Button Name="OkButton" Width="80"/>
+      <Button Name="CancelButton" Width="80" IsVisible="False"/>
     </StackPanel>
   </StackPanel>
 </Window>
