@@ -6,13 +6,13 @@ namespace YouTubeDownloader;
 
 internal static class ThemeSettings
 {
-    public static string GetPath(string appDirectory) => Path.Combine(appDirectory, "theme.txt");
+    public static string GetPath(string directory) => Path.Combine(directory, "theme.txt");
 
-    public static string Load(string appDirectory)
+    public static string Load(string directory)
     {
         try
         {
-            string text = File.ReadAllText(GetPath(appDirectory)).Trim();
+            string text = File.ReadAllText(GetPath(directory)).Trim();
             return text is "Light" or "Dark" ? text : "Default";
         }
         catch
@@ -21,11 +21,11 @@ internal static class ThemeSettings
         }
     }
 
-    public static void Save(string appDirectory, string name)
+    public static void Save(string directory, string name)
     {
         try
         {
-            File.WriteAllText(GetPath(appDirectory), name);
+            File.WriteAllText(GetPath(directory), name);
         }
         catch
         {

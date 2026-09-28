@@ -15,8 +15,7 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            string appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            RequestedThemeVariant = ThemeSettings.ToVariant(ThemeSettings.Load(appDirectory));
+            RequestedThemeVariant = ThemeSettings.ToVariant(ThemeSettings.Load(AppPaths.DataDirectory));
 
             desktop.MainWindow = new MainWindow();
         }

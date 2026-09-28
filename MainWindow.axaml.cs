@@ -23,6 +23,8 @@ public partial class MainWindow : Window
     private readonly List<Button> removeUrlButtons = new();
     private readonly HttpClient httpClient;
     private readonly string appDirectory;
+    private readonly string dataDirectory;
+    private readonly string ffmpegVersionPath;
     private readonly string ytDlpPath;
     private readonly string ffmpegBinPath;
     private readonly string denoPath;
@@ -32,12 +34,21 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         httpClient = new HttpClient();
-        appDirectory = AppDomain.CurrentDomain.BaseDirectory;
-        ytDlpPath = Path.Combine(appDirectory, OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp");
-        ffmpegBinPath = Path.Combine(appDirectory, "ffmpeg_bin");
-        denoPath = Path.Combine(appDirectory, OperatingSystem.IsWindows() ? "deno.exe" : "deno");
-        denoVersionPath = Path.Combine(appDirectory, "deno_version.txt");
-        nodeJsPath = Path.Combine(appDirectory, OperatingSystem.IsWindows() ? "node.exe" : "node");
+        // Set once: adding it per request (as before) appended a duplicate value each call.
+        httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("YouTubeDownloader/1.0");
+        appDirectory = AppPaths.AppDirectory;
+        dataDirectory = AppPaths.DataDirectory;
+        ytDlpPath = Path.Combine(dataDirectory, OperatingSystem.IsWindows() ? "yt-dlp.exe" : "yt-dlp");
+        ffmpegBinPath = Path.Combine(dataDirectory, "ffmpeg_bin");
+        ffmpegVersionPath = Path.Combine(dataDirectory, "ffmpeg_version.txt");
+        denoPath = Path.Combine(dataDirectory, OperatingSystem.IsWindows() ? "deno.exe" : "deno");
+        denoVersionPath = Path.Combine(dataDirectory, "deno_version.txt");
+
+        // Node is never downloaded by the app - users drop it in by hand, so keep
+        // honouring a copy next to the exe from before the data directory existed.
+        string nodeName = OperatingSystem.IsWindows() ? "node.exe" : "node";
+        string dataNodePath = Path.Combine(dataDirectory, nodeName);
+        nodeJsPath = File.Exists(dataNodePath) ? dataNodePath : Path.Combine(appDirectory, nodeName);
 
         InitializeComponent();
 
@@ -69,7 +80,7 @@ public partial class MainWindow : Window
         MiThemeDark.Click += (s, e) => SetTheme("Dark");
         MiThemeSystem.Click += (s, e) => SetTheme("Default");
 
-        string currentTheme = ThemeSettings.Load(appDirectory);
+        string currentTheme = ThemeSettings.Load(dataDirectory);
         MiThemeLight.IsChecked = currentTheme == "Light";
         MiThemeDark.IsChecked = currentTheme == "Dark";
         MiThemeSystem.IsChecked = currentTheme == "Default";
@@ -80,7 +91,7 @@ public partial class MainWindow : Window
     private void SetTheme(string name)
     {
         Application.Current!.RequestedThemeVariant = ThemeSettings.ToVariant(name);
-        ThemeSettings.Save(appDirectory, name);
+        ThemeSettings.Save(dataDirectory, name);
     }
 
     protected override void OnClosed(EventArgs e)
@@ -165,31 +176,14 @@ public partial class MainWindow : Window
         }
 
         UpdateStatus("Wszystkie komponenty sa dostepne. Gotowy do pobierania.");
+
+        // Versions before the data directory kept the tools next to the exe. Remove
+        // those copies only once working replacements exist in the data directory.
+        if (File.Exists(ytDlpPath) && Directory.Exists(ffmpegBinPath) && !string.IsNullOrEmpty(GetRuntimePath()))
+            AppPaths.CleanupLegacyFiles(appDirectory, dataDirectory);
     }
 
-    private bool IsRuntimeInPath()
-    {
-        try
-        {
-            var processInfo = new ProcessStartInfo
-            {
-                FileName = OperatingSystem.IsWindows() ? "where" : "which",
-                Arguments = "deno",
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                CreateNoWindow = true
-            };
-
-            using var process = Process.Start(processInfo);
-            if (process != null)
-            {
-                process.WaitForExit(2000);
-                return process.ExitCode == 0;
-            }
-        }
-        catch { }
-        return false;
-    }
+    private bool IsRuntimeInPath() => !string.IsNullOrEmpty(FindSystemDeno());
 
     private string GetRuntimePath()
     {
@@ -199,6 +193,13 @@ public partial class MainWindow : Window
         if (File.Exists(nodeJsPath))
             return nodeJsPath;
 
+        return FindSystemDeno();
+    }
+
+    // First `where`/`which` hit outside the app folder. `where` also returns every
+    // match on its own line, so the raw output is never usable as a path directly.
+    private string FindSystemDeno()
+    {
         try
         {
             var processInfo = new ProcessStartInfo
@@ -211,20 +212,17 @@ public partial class MainWindow : Window
             };
 
             using var process = Process.Start(processInfo);
-            if (process != null)
-            {
-                process.WaitForExit();
-                if (process.ExitCode == 0)
-                {
-                    string output = process.StandardOutput.ReadToEnd().Trim();
-                    if (!string.IsNullOrEmpty(output))
-                        return output;
-                }
-            }
-        }
-        catch { }
+            if (process == null)
+                return "";
 
-        return "";
+            string output = process.StandardOutput.ReadToEnd();
+            process.WaitForExit();
+            return process.ExitCode == 0 ? AppPaths.PickFirstPathOutside(output, appDirectory) : "";
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            return "";
+        }
     }
 
     private static string GetDenoAssetName()
@@ -247,7 +245,6 @@ public partial class MainWindow : Window
     {
         try
         {
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("YouTubeDownloader/1.0");
             string apiUrl = "https://api.github.com/repos/denoland/deno/releases/latest";
 
             var response = await httpClient.GetStringAsync(apiUrl);
@@ -292,7 +289,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            string zipPath = Path.Combine(appDirectory, "deno.zip");
+            string zipPath = Path.Combine(dataDirectory, "deno.zip");
             await DownloadFileWithProgress(downloadUrl, zipPath);
 
             UpdateStatus("Rozpakowywanie Deno...");
@@ -307,7 +304,7 @@ public partial class MainWindow : Window
 
             File.Delete(zipPath);
 
-            MakeExecutable(denoPath);
+            AppPaths.MakeExecutable(denoPath);
 
             if (!string.IsNullOrEmpty(version))
                 await File.WriteAllTextAsync(denoVersionPath, version);
@@ -342,7 +339,7 @@ public partial class MainWindow : Window
         {
             string url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/" + GetYtDlpAssetName();
             await DownloadFileWithProgress(url, ytDlpPath);
-            MakeExecutable(ytDlpPath);
+            AppPaths.MakeExecutable(ytDlpPath);
             UpdateStatus("yt-dlp pobrane");
         }
         catch (Exception ex)
@@ -373,7 +370,6 @@ public partial class MainWindow : Window
     {
         try
         {
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("YouTubeDownloader/1.0");
             string releasesUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases";
             var response = await httpClient.GetStringAsync(releasesUrl);
             var jsonDoc = JsonDocument.Parse(response);
@@ -426,7 +422,6 @@ public partial class MainWindow : Window
     {
         try
         {
-            httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("YouTubeDownloader/1.0");
             string apiUrl = "https://api.github.com/repos/eugeneware/ffmpeg-static/releases/latest";
 
             var response = await httpClient.GetStringAsync(apiUrl);
@@ -509,7 +504,7 @@ public partial class MainWindow : Window
 
             UpdateStatus("Pobieranie FFmpeg (" + version + ")...");
             string archiveExtension = OperatingSystem.IsWindows() ? ".zip" : ".tar.xz";
-            string archivePath = Path.Combine(appDirectory, "ffmpeg" + archiveExtension);
+            string archivePath = Path.Combine(dataDirectory, "ffmpeg" + archiveExtension);
 
             await DownloadFileWithProgress(downloadUrl, archivePath);
 
@@ -518,7 +513,7 @@ public partial class MainWindow : Window
             if (Directory.Exists(ffmpegBinPath))
                 Directory.Delete(ffmpegBinPath, true);
 
-            string tempExtractPath = Path.Combine(appDirectory, "ffmpeg_temp");
+            string tempExtractPath = Path.Combine(dataDirectory, "ffmpeg_temp");
             if (Directory.Exists(tempExtractPath))
                 Directory.Delete(tempExtractPath, true);
 
@@ -537,11 +532,10 @@ public partial class MainWindow : Window
                 string fileName = Path.GetFileName(file);
                 string destFile = Path.Combine(ffmpegBinPath, fileName);
                 File.Copy(file, destFile, true);
-                MakeExecutable(destFile);
+                AppPaths.MakeExecutable(destFile);
             }
 
-            string versionFile = Path.Combine(appDirectory, "ffmpeg_version.txt");
-            await File.WriteAllTextAsync(versionFile, version);
+            await File.WriteAllTextAsync(ffmpegVersionPath, version);
 
             File.Delete(archivePath);
             Directory.Delete(tempExtractPath, true);
@@ -575,13 +569,12 @@ public partial class MainWindow : Window
             string ffprobeDestPath = Path.Combine(ffmpegBinPath, "ffprobe");
 
             await DownloadFileWithProgress(ffmpegUrl, ffmpegDestPath);
-            MakeExecutable(ffmpegDestPath);
+            AppPaths.MakeExecutable(ffmpegDestPath);
 
             await DownloadFileWithProgress(ffprobeUrl, ffprobeDestPath);
-            MakeExecutable(ffprobeDestPath);
+            AppPaths.MakeExecutable(ffprobeDestPath);
 
-            string versionFile = Path.Combine(appDirectory, "ffmpeg_version.txt");
-            await File.WriteAllTextAsync(versionFile, version);
+            await File.WriteAllTextAsync(ffmpegVersionPath, version);
 
             UpdateStatus("FFmpeg pobrane. Wersja: " + version);
         }
@@ -627,17 +620,6 @@ public partial class MainWindow : Window
         }
 
         ProgressBarDownload.Value = 0;
-    }
-
-    private static void MakeExecutable(string path)
-    {
-        if (OperatingSystem.IsWindows())
-            return;
-
-        File.SetUnixFileMode(path,
-            UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute |
-            UnixFileMode.GroupRead | UnixFileMode.GroupExecute |
-            UnixFileMode.OtherRead | UnixFileMode.OtherExecute);
     }
 
     private async Task CheckAndUpdateDeno()
@@ -686,11 +668,10 @@ public partial class MainWindow : Window
             else
                 (_, latestVersion) = await GetLatestFFmpegInfo();
 
-            string versionFile = Path.Combine(appDirectory, "ffmpeg_version.txt");
             string currentVersion = "";
 
-            if (File.Exists(versionFile))
-                currentVersion = await File.ReadAllTextAsync(versionFile);
+            if (File.Exists(ffmpegVersionPath))
+                currentVersion = await File.ReadAllTextAsync(ffmpegVersionPath);
 
             if (string.IsNullOrEmpty(currentVersion) || currentVersion != latestVersion)
             {
