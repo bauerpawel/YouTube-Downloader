@@ -4,7 +4,7 @@
 
 <img src="logo.svg" alt="YouTube Downloader Logo" width="480"/>
 
-![Version](https://img.shields.io/badge/Version-2.0.280926-brightgreen)
+![Version](https://img.shields.io/badge/Version-2.0.290926-brightgreen)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-0078D6?logo=windows)
@@ -24,7 +24,12 @@
 
 ### 📝 Opis
 
-YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64), zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim do wyboru jakości i formatu pobierania.
+YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64), zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim i angielskim do wyboru jakości i formatu pobierania.
+
+### 🆕 Co nowego w wersji 2.0.290926
+
+- 🇬🇧 **Wersja angielska** - interfejs po polsku i po angielsku. Przy pierwszym uruchomieniu język dobierany jest do języka systemu (polski system → polski, inny → angielski), zmiana w menu Widok → Język działa od razu i jest zapamiętywana
+- 🔤 **Polskie znaki** - polskie teksty interfejsu pisane są teraz z polskimi znakami („Błąd”, „Narzędzia”, „Jakość”)
 
 ### 🆕 Co nowego w wersji 2.0.280926
 
@@ -49,7 +54,7 @@ YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64)
 - 📁 **Wybór formatu** - mp4, webm, mkv
 - 📊 **Pasek postępu** - Wizualizacja postępu pobierania w czasie rzeczywistym
 - 🔄 **Aktualizacja komponentów** - Łatwa aktualizacja yt-dlp i FFmpeg z poziomu aplikacji
-- 🇵🇱 **Polski interfejs** - Pełne wsparcie języka polskiego
+- 🇵🇱🇬🇧 **Interfejs PL/EN** - Polski i angielski, wybór w menu Widok → Język
 
 ### 🛠️ Wymagania
 
@@ -188,6 +193,9 @@ YouTube-Downloader/
 ├── AppPaths.cs                  # Folder aplikacji vs katalog danych użytkownika, sprzątanie starych plików
 ├── AppUpdater.cs                # Samoaktualizacja aplikacji z GitHub Releases
 ├── GitHubApi.cs                 # Zapytania do GitHub API (opcjonalny token YTD_GITHUB_TOKEN w CI)
+├── Strings.cs                   # Teksty interfejsu po polsku i angielsku
+├── LanguageSettings.cs          # Wybór i zapis języka (language.txt)
+├── YtDlpArguments.cs            # Argumenty yt-dlp dla jakości/formatu
 ├── Assets/
 │   └── app-logo.png             # Logo aplikacji, widoczne w oknie Informacje i oknach komunikatów
 ├── YouTubeDownloader.csproj     # Konfiguracja projektu .NET 10 (pakiety Avalonia)
@@ -227,7 +235,12 @@ Zgłoszenia błędów i pull requesty są mile widziane na GitHub.
 
 ### 📝 Description
 
-YouTube Downloader is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish-language interface for selecting download quality and format.
+YouTube Downloader is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish and English interface for selecting download quality and format.
+
+### 🆕 What's New in 2.0.290926
+
+- 🇬🇧 **English interface** - the UI is available in Polish and English. On first launch the language follows the system language (Polish system → Polish, anything else → English); switch any time in View → Language, it applies immediately and is remembered
+- 🔤 **Polish diacritics** - the Polish UI texts now use proper Polish characters
 
 ### 🆕 What's New in 2.0.280926
 
@@ -252,7 +265,7 @@ YouTube Downloader is a Windows, Linux, and macOS desktop application built with
 - 📁 **Format selection** - mp4, webm, mkv
 - 📊 **Progress bar** - Real-time download progress visualization
 - 🔄 **Component updates** - Easy updates for yt-dlp and FFmpeg from within the app
-- 🇵🇱 **Polish interface** - Full Polish language support
+- 🇵🇱🇬🇧 **PL/EN interface** - Polish and English, switchable in View → Language
 
 ### 🛠️ Requirements
 
@@ -391,6 +404,9 @@ YouTube-Downloader/
 ├── AppPaths.cs                  # App folder vs per-user data folder, legacy-file cleanup
 ├── AppUpdater.cs                # App self-update from GitHub Releases
 ├── GitHubApi.cs                 # GitHub API requests (optional YTD_GITHUB_TOKEN in CI)
+├── Strings.cs                   # UI texts in Polish and English
+├── LanguageSettings.cs          # Language choice and persistence (language.txt)
+├── YtDlpArguments.cs            # yt-dlp arguments for quality/format
 ├── Assets/
 │   └── app-logo.png             # Application logo, shown in About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)

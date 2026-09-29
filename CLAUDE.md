@@ -2,13 +2,13 @@
 
 ## Project Overview
 
-**YouTube Downloader** is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables users to download videos and audio from YouTube, including from multiple links in a single run. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish-language interface for selecting download quality and format.
+**YouTube Downloader** is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables users to download videos and audio from YouTube, including from multiple links in a single run. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish and English interface for selecting download quality and format.
 
 ### Key Information
 - **Technology Stack**: .NET 10, C# 13, Avalonia UI 12.1.2
 - **Target Platform**: Windows, Linux, and macOS (x64/ARM64), `net10.0`. Built and published for all three OSes, and CI-smoke-tested on `ubuntu-latest` and `macos-latest` in addition to `windows-latest` - see [Development Workflows](#development-workflows). macOS binaries are unsigned (no Apple Developer account) - users see a one-time Gatekeeper warning on first launch, see [External Dependencies](#external-dependencies)
 - **License**: Apache License 2.0
-- **Primary Language**: C# with Polish UI text
+- **Primary Language**: C# with Polish and English UI text (see `Strings.cs`)
 - **Architecture**: Avalonia UI application (XAML + code-behind, no MVVM) with external dependency management
 
 ## Repository Structure
@@ -31,6 +31,9 @@ YouTube-Downloader/
 │                                 # MakeExecutable() and safe-delete helpers (no Avalonia)
 ├── AppUpdater.cs                # App self-update from GitHub Releases (no UI, no Avalonia)
 ├── GitHubApi.cs                 # GitHub REST API GETs; optional YTD_GITHUB_TOKEN auth (CI)
+├── Strings.cs                   # Every UI text, Polish + English instances (required members)
+├── LanguageSettings.cs          # Resolves/loads/saves the UI language (language.txt, data folder)
+├── YtDlpArguments.cs            # yt-dlp format args from quality values (not display text)
 ├── Assets/
 │   └── app-logo.png             # Application logo, shown in About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
@@ -69,7 +72,8 @@ Data Directory/
 │   ├── ffplay.exe
 │   └── *.dll                   # FFmpeg shared libraries (win64-gpl-shared build)
 ├── ffmpeg_version.txt          # Tracks current FFmpeg version
-└── theme.txt                   # Light/Dark/Default theme choice
+├── theme.txt                   # Light/Dark/Default theme choice
+└── language.txt                # UI language: pl or en
 ```
 
 **Migration from older versions:** versions before 2.0.280926 kept the tools next to the exe. `AppPaths.CleanupLegacyFiles()` (called at the end of `CheckAndDownloadComponents()` once working copies exist in the data folder) deletes exactly `yt-dlp(.exe)`, `deno(.exe)`, `deno_version.txt`, `theme.txt`, `ffmpeg_bin/`, `ffmpeg_temp/` and finally the marker `ffmpeg_version.txt` - but only when that marker exists (proof the folder was managed by an old version; the app folder may be the user's Downloads folder). `node`, `downloads/` and the old temp archives are never touched.
@@ -101,7 +105,9 @@ Named elements (`Name`) become strongly-typed, non-nullable code-behind fields a
 - `ProgressBarDownload`: ProgressBar for download progress
 - `LblStatus`: TextBlock for status messages and real-time progress
 - `MiAktualizujKomponenty` / `MiInformacje`: menu items for "Aktualizuj komponenty" (Update Components) / "Informacje" (About)
-- `MiSprawdzAktualizacje`: menu item "Sprawdz aktualizacje aplikacji" (Check for app updates), next to "Aktualizuj komponenty"
+- `MiSprawdzAktualizacje`: menu item "Sprawdź aktualizacje aplikacji" (Check for app updates), next to "Aktualizuj komponenty"
+- `MiLanguage` -> `MiLangPolish` / `MiLangEnglish`: View -> Language radio items ("Polski", "English" - always in their own language)
+- `LblUrl`, `LblContentType`, `LblQuality`, `LblFormat`: labels whose text is set from `Strings` in `ApplyTexts()`
 
 #### 2. Multi-URL Handling (`MainWindow.axaml.cs`)
 **BtnAddUrl_Click() / RemoveUrlRow()**
@@ -312,11 +318,7 @@ This environment has no full GUI test automation - there is no headless/CI-runna
   - XAML-named elements: PascalCase (`TxtUrl`, `CbQuality`, `BtnDownload`) per Avalonia/XAML convention
   - Methods: PascalCase with descriptive names
   - Event handlers: `ControlName_EventType` pattern (e.g. `ContentType_Changed`, `BtnAddUrl_Click`)
-- **Polish UI Text**: All user-facing strings are in Polish
-  - "Pobierz" = Download
-  - "Jakosc" = Quality
-  - "Format" = Format
-  - "Gotowy do pobierania" = Ready to download
+- **UI text lives only in `Strings.cs`**, in both `Strings.Polish` and `Strings.English`. Every property is `required`, so a text missing from either language is a compile error; parameterized texts are `Func<>` properties. Code reads them via `Strings.Current` (`Ui` in `MainWindow`). Polish texts use proper diacritics; menu access keys (`_`) are chosen per language. XAML holds no user-facing text - windows set it in code (`MainWindow.ApplyTexts()`, the `AboutWindow`/`MessageDialog` constructors)
 
 ### Avalonia UI Conventions
 - **Framework**: Avalonia UI 12.1.2 (XAML + code-behind, no MVVM) - controls are declared in a `.axaml` file, and all logic lives in the paired `.axaml.cs` code-behind class
@@ -412,13 +414,13 @@ The application parses yt-dlp output using regex patterns:
    - Update the user-facing success message that reports the location
 
 2. **Update UI Text/Language**:
-   - Static text (labels, button content) lives in the `.axaml` files (e.g. `Content="Pobierz"`)
-   - Dynamic text (status/error messages) is inline in `MainWindow.axaml.cs`, passed to `UpdateStatus()` and `MessageDialog`
-   - Update the window `Title` in `MainWindow.axaml`
+   - Add/change the property in `Strings.cs` and set it in **both** instances
+   - Main-window static texts are applied in `MainWindow.ApplyTexts()` (runs at startup and on every language switch); dialogs/About read `Strings.Current` when constructed
+   - A new language = a new `Strings` instance, a code in `LanguageSettings`, a case in `Strings.For()` and a menu item
 
 3. **Change Quality Options**:
-   - Modify the `CbQuality.Items.Add(...)` calls in the `MainWindow()` constructor
-   - Update the quality branches in `BuildYtDlpArguments()`
+   - Edit `YtDlpArguments.QualityHeights` (value per list position) and, if needed, `QualityLabel()`; only the "best" label is translated (`Strings.QualityBest`)
+   - `YtDlpArguments.Build()` turns the value into yt-dlp arguments - never branch on display text
 
 ### Common Tasks
 
@@ -458,7 +460,7 @@ using (var process = Process.Start(processInfo))
 ### When Adding Features
 1. **Keep the existing file split** - UI in the appropriate `.axaml`/`.axaml.cs` pair; avoid introducing new architectural layers (e.g. MVVM/ViewModels) unless the user asks for it
 2. **Follow existing async/await patterns** for all I/O operations
-3. **Use Polish text** for user-facing messages (or ask user for preferred language)
+3. **Add every new user-facing text to `Strings.cs` in both languages** (Polish with diacritics)
 4. **Update progress indicators** for long-running operations
 5. **Handle errors gracefully** with `MessageDialog` and status updates
 6. **Test dependency availability** before executing external tools
@@ -508,6 +510,8 @@ Before committing changes, verify:
 - [ ] Theme choice survives a restart (theme.txt in the data folder)
 - [ ] "Sprawdz aktualizacje aplikacji" on a local build shows the "aktualizacje wylaczone" message
 - [ ] A CI build older than the latest release offers the update, installs it and restarts
+- [ ] Language switch (View -> Language) updates menu, labels and lists immediately; the choice survives a restart
+- [ ] A download works with the English UI ("Best" and a fixed quality)
 
 ## External Dependencies
 
