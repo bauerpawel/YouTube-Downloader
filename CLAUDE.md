@@ -394,8 +394,9 @@ The application parses yt-dlp output using regex patterns:
 ### Adding New Features
 
 1. **New Download Options**:
-   - Add to the `CbQuality`/`CbFormat` item lists in the `MainWindow()` constructor (`MainWindow.axaml.cs`)
-   - Update `BuildYtDlpArguments()` to handle the new option
+   - Quality: add the value to `YtDlpArguments.QualityHeights` (the list is rebuilt from it in `MainWindow.ApplyTexts()`); `YtDlpArguments.Build()` turns values into yt-dlp arguments
+   - Format: add it to the `CbFormat` items in the `MainWindow()` constructor and a case in `YtDlpArguments.Build()`
+   - Any label for the option goes into `Strings.cs` in both languages - never branch on display text
 
 2. **New UI Elements**:
    - Add the element to the appropriate `.axaml` file with a `Name` - Avalonia's XAML compiler generates the code-behind field automatically, no manual field declaration needed
@@ -426,17 +427,26 @@ The application parses yt-dlp output using regex patterns:
 
 **Adding a new menu item**:
 ```xml
-<!-- In MainWindow.axaml, inside the relevant <MenuItem Header="_Narzedzia"> or <MenuItem Header="_Pomoc"> -->
-<MenuItem Name="MiNewFeature" Header="_Nowa funkcja"/>
+<!-- In MainWindow.axaml, inside MiTools / MiView / MiHelp - no Header here, it comes from Strings -->
+<MenuItem Name="MiNewFeature"/>
 ```
 ```csharp
+// Strings.cs - required property, set in BOTH instances (access key per language):
+public required string MenuNewFeature { get; init; }
+//   Polish:  MenuNewFeature = "_Nowa funkcja",
+//   English: MenuNewFeature = "_New feature",
+
+// MainWindow.ApplyTexts():
+MiNewFeature.Header = Ui.MenuNewFeature;
+
 // In the MainWindow() constructor, after InitializeComponent():
 MiNewFeature.Click += async (s, e) => await NewFeature_Click();
 ```
 
 **Updating status message**:
 ```csharp
-UpdateStatus("Your status message here");
+UpdateStatus(Ui.StatusSomething);          // plain text: a string property in Strings.cs
+UpdateStatus(Ui.StatusFileCount(n));       // with values: a Func<> property in Strings.cs
 ```
 
 **Executing external command**:
