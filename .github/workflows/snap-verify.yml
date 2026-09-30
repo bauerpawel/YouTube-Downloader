@@ -97,6 +97,8 @@ jobs:
           echo "Tools not in $COMMON after 120 s (or the app stopped)"
           ls -la "$COMMON" "$COMMON/ffmpeg_bin" 2>&1 || true
           cat "$LOG"
+          echo "--- AppArmor / seccomp denials:"
+          sudo dmesg | grep -E 'apparmor="DENIED"|type=1326' | tail -40 || true
         fi
         pkill -f yt-downloader-bp || true
         sudo snap remove --purge yt-downloader-bp
