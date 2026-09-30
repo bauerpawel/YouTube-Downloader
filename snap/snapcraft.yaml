@@ -40,20 +40,25 @@ parts:
     # plus version.txt - CI creates snap-bin/, it is not in the repo.
     plugin: dump
     source: snap-bin/
+    # bsdtar becomes the snap's tar ($SNAP/usr/bin comes first in PATH): the
+    # app unpacks FFmpeg's .tar.xz with `tar -xf`, and core24's GNU tar 1.35
+    # extracts through openat2, which snapd's seccomp profile denies outright
+    # (EPERM, no fallback - "Cannot mkdir: Operation not permitted"). bsdtar
+    # (libarchive 3.7) does not use openat2 and reads xz itself.
     organize:
       YouTubeDownloader: bin/YouTubeDownloader
+      usr/bin/bsdtar: usr/bin/tar
     prime:
       - -version.txt
     # ICU: .NET globalization. OpenSSL: HTTPS in .NET on Linux. ICE/SM: X11
     # session libraries Avalonia loads (the Linux smoke test installs them too).
-    # xz: the app unpacks FFmpeg's .tar.xz with the system tar, which runs xz
-    # from PATH - core24 has tar but no xz.
+    # libarchive-tools: bsdtar, see organize above.
     stage-packages:
       - libicu74
       - libssl3t64
       - libice6
       - libsm6
-      - xz-utils
+      - libarchive-tools
     override-build: |
       craftctl default
       craftctl set version="$(cat "$CRAFT_PART_SRC/version.txt")"

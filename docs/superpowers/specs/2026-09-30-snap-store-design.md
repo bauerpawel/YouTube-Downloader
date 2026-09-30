@@ -129,6 +129,7 @@ parts:
     source: snap-bin/
     organize:
       YouTubeDownloader: bin/YouTubeDownloader
+      usr/bin/bsdtar: usr/bin/tar
     prime:
       - -version.txt
     stage-packages:
@@ -136,7 +137,7 @@ parts:
       - libssl3t64
       - libice6
       - libsm6
-      - xz-utils
+      - libarchive-tools
     override-build: |
       craftctl default
       craftctl set version="$(cat "$CRAFT_PART_SRC/version.txt")"
@@ -150,10 +151,14 @@ parts:
   pakietu (kilkaset MB) u użytkownika, który nie ma innych snapów GNOME.
 - `stage-packages`: ICU (globalizacja .NET), OpenSSL (HTTPS w .NET na Linuksie),
   `libice6`/`libsm6` (X11 dla Avalonii - te same biblioteki doinstalowuje dziś
-  test dymny Linuksa), `xz-utils` (aplikacja rozpakowuje `.tar.xz` z FFmpeg
-  systemowym `tar`, który uruchamia `xz` z `PATH` - baza `core24` ma `tar`,
-  ale nie ma `xz`; wykryte przez test dymny snapa). Duplikaty z content
-  snapa/bazy są nieszkodliwe.
+  test dymny Linuksa), `libarchive-tools` - `bsdtar` jako `$SNAP/usr/bin/tar`
+  (pierwszy w `PATH` snapa). Aplikacja rozpakowuje `.tar.xz` z FFmpeg przez
+  `tar -xf`; GNU tar 1.35 z `core24` rozpakowuje przez `openat2`, którego
+  seccomp snapd zabrania w całości (`~openat2`, `EPERM` bez fallbacku →
+  „Cannot mkdir: Operation not permitted”), a `core24` nie ma też `xz`.
+  `bsdtar` (libarchive 3.7) nie używa `openat2` i czyta xz sam. Wykryte przez
+  test dymny snapa (log jądra: `type=1326 … exe="/usr/bin/tar" syscall=437`).
+  Duplikaty z content snapa/bazy są nieszkodliwe.
 - Wersja snapa = tag release'u bez `v`, np. `2.0.300926-27` (limit Store: 32
   znaki, dozwolone `[A-Za-z0-9.+~-]`).
 - Folder aplikacji w snapie to `$SNAP/bin/` (`AppContext.BaseDirectory`).
