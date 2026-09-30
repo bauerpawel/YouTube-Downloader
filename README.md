@@ -31,6 +31,7 @@ YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64)
 - 🇬🇧 **Wersja angielska** - interfejs po polsku i po angielsku. Przy pierwszym uruchomieniu język dobierany jest do języka systemu (polski system → polski, inny → angielski), zmiana w menu Widok → Język działa od razu i jest zapamiętywana
 - 🔤 **Polskie znaki** - polskie teksty interfejsu pisane są teraz z polskimi znakami („Błąd”, „Narzędzia”, „Jakość”)
 - 🐛 **Naprawiony restart po automatycznej aktualizacji** (Windows, Linux) - nowa wersja podmieniana jest dopiero po zamknięciu aplikacji, więc restart nie kończy się już błędem „Could not load file or assembly”. Aktualizacja ze starszej wersji może jeszcze raz pokazać ten komunikat - nowa wersja jest wtedy już zainstalowana, wystarczy uruchomić ją ręcznie
+- 🐧 **Snap Store** - aplikacja jest dostępna jako snap: `sudo snap install yt-downloader-bp` (amd64 i arm64), aktualizowana automatycznie przez Snap Store. Pobrane pliki trafiają do folderu Pobrane, do „YouTube Downloader”
 
 ### 🆕 Co nowego w wersji 2.0.280926
 
@@ -156,6 +157,16 @@ bin/Release/net10.0/win-x64/publish/
 ```
 (dla pozostałych RID-ów analogicznie, np. `bin/Release/net10.0/win-arm64/publish/`, `bin/Release/net10.0/linux-x64/publish/`, `bin/Release/net10.0/osx-arm64/publish/` itd.)
 
+### 🐧 Instalacja przez Snap (Linux)
+
+[![yt-downloader-bp](https://snapcraft.io/yt-downloader-bp/badge.svg)](https://snapcraft.io/yt-downloader-bp)
+
+```bash
+sudo snap install yt-downloader-bp
+```
+
+Wersję snap aktualizuje Snap Store (automatyczna aktualizacja w samej aplikacji jest w niej wyłączona). Pobrane pliki trafiają do systemowego folderu pobranych, do podfolderu `YouTube Downloader` (np. `~/Pobrane/YouTube Downloader`).
+
 ### 🚀 Użytkowanie
 
 1. **Uruchom aplikację** - Otwórz pobrany plik (np. `YouTubeDownloader-win-x64.exe`). Przy pierwszym uruchomieniu aplikacja sama pobierze yt-dlp, FFmpeg i Deno
@@ -164,7 +175,7 @@ bin/Release/net10.0/win-x64/publish/
 4. **Wybierz jakość** - Od "Najlepsza" do 240p (w trybie audio pole jest nieaktywne)
 5. **Wybierz format** - mp4 (zalecany), webm lub mkv
 6. **Kliknij "Pobierz"** - Aplikacja rozpocznie pobieranie i pokaże postęp
-7. **Pliki w folderze downloads** - Pobrane pliki znajdziesz w folderze `downloads` w katalogu aplikacji
+7. **Pliki w folderze downloads** - Pobrane pliki znajdziesz w folderze `downloads` w katalogu aplikacji (w wersji snap: `YouTube Downloader` w folderze Pobrane)
 
 Język interfejsu zmienisz w menu **Widok → Język** (Polski / English). Przy pierwszym uruchomieniu dobierany jest do języka systemu.
 
@@ -206,6 +217,7 @@ YouTube-Downloader/
 ├── logo.svg                     # Źródłowe logo aplikacji (SVG)
 ├── build.bat                    # Owija `dotnet publish` dla win-x64/win-arm64
 ├── build.sh                     # Owija `dotnet publish` dla linux-x64/linux-arm64/osx-x64/osx-arm64
+├── snap/                        # Pakiet Snap Store (snapcraft.yaml, skrót w menu)
 ├── README.md                    # Dokumentacja projektu
 ├── LICENSE                      # Licencja Apache 2.0
 ├── CLAUDE.md                    # Przewodnik dla asystentów AI
@@ -245,6 +257,7 @@ YouTube Downloader is a Windows, Linux, and macOS desktop application built with
 - 🇬🇧 **English interface** - the UI is available in Polish and English. On first launch the language follows the system language (Polish system → Polish, anything else → English); switch any time in View → Language, it applies immediately and is remembered
 - 🔤 **Polish diacritics** - the Polish UI texts now use proper Polish characters
 - 🐛 **Fixed restart after an automatic update** (Windows, Linux) - the new version is swapped in only after the app has closed, so the restart no longer fails with "Could not load file or assembly". Updating from an older version may still show that message once - the new version is already installed then, just start it manually
+- 🐧 **Snap Store** - the app is available as a snap: `sudo snap install yt-downloader-bp` (amd64 and arm64), updated automatically by the Snap Store. Downloads go to your Downloads folder, in "YouTube Downloader"
 
 ### 🆕 What's New in 2.0.280926
 
@@ -370,6 +383,16 @@ bin/Release/net10.0/win-x64/publish/
 ```
 (for the other RIDs, respectively, e.g. `bin/Release/net10.0/win-arm64/publish/`, `bin/Release/net10.0/linux-x64/publish/`, `bin/Release/net10.0/osx-arm64/publish/`, etc.)
 
+### 🐧 Install via Snap (Linux)
+
+[![yt-downloader-bp](https://snapcraft.io/yt-downloader-bp/badge.svg)](https://snapcraft.io/yt-downloader-bp)
+
+```bash
+sudo snap install yt-downloader-bp
+```
+
+The snap is updated by the Snap Store (the in-app self-update is off there). Downloads go to your system Downloads folder, into a `YouTube Downloader` subfolder (e.g. `~/Downloads/YouTube Downloader`).
+
 ### 🚀 Usage
 
 1. **Launch the application** - Open the downloaded file (e.g. `YouTubeDownloader-win-x64.exe`). On first launch the app downloads yt-dlp, FFmpeg and Deno by itself
@@ -378,7 +401,7 @@ bin/Release/net10.0/win-x64/publish/
 4. **Select the quality** - From "Best" down to 240p (disabled in audio mode)
 5. **Select the format** - mp4 (recommended), webm, or mkv
 6. **Click "Download"** - The application starts downloading and shows the progress
-7. **Files in the downloads folder** - Downloaded files will be in the `downloads` folder in the application directory
+7. **Files in the downloads folder** - Downloaded files will be in the `downloads` folder in the application directory (snap: `YouTube Downloader` in your Downloads folder)
 
 The interface language can be changed in **View → Language** (Polski / English). On first launch it follows the system language.
 
@@ -420,6 +443,7 @@ YouTube-Downloader/
 ├── logo.svg                     # Source application logo (SVG)
 ├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64
 ├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64/osx-x64/osx-arm64
+├── snap/                        # Snap Store package (snapcraft.yaml, menu entry)
 ├── README.md                    # Project documentation
 ├── LICENSE                      # Apache 2.0 license
 ├── CLAUDE.md                    # AI assistant guide

@@ -343,3 +343,121 @@ jobs:
         prerelease: false
         files: |
           ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
+
+  # Snap Store package yt-downloader-bp (docs/superpowers/specs/2026-09-30-snap-store-design.md).
+  # Packs the linux single-file binaries the publish job just built and
+  # smoke-tested, tests the installed snap, then releases it to stable. Runs
+  # after publish, so a failing snap never holds back the GitHub Release.
+  snap:
+    needs: publish
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # not on forked PRs
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+            rid: linux-x64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            rid: linux-arm64
+
+    runs-on: ${{ matrix.runner }}
+
+    # Only whether the secret exists. The secret itself reaches the publish step
+    # alone: the smoke test runs yt-dlp and Deno downloaded from the internet,
+    # and they inherit the environment.
+    env:
+      HAS_SNAP_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS != '' }}
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v7
+
+    - name: Download the published single-file binary
+      uses: actions/download-artifact@v8
+      with:
+        name: YouTubeDownloader-${{ matrix.rid }}
+        path: snap-bin
+
+
+    - name: Prepare snap-bin (binary + version)
+      run: |
+        chmod +x snap-bin/YouTubeDownloader
+        version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' YouTubeDownloader.csproj)
+        echo "${version}-${{ github.run_number }}" > snap-bin/version.txt
+        echo "Snap version: $(cat snap-bin/version.txt)"
+
+    - name: Build snap
+      id: build
+      uses: snapcore/action-build@v1
+
+    # Installs the snap the way a user gets it (strict confinement,
+    # auto-connected interfaces) and checks that the app starts and can
+    # download AND run its tools from $SNAP_USER_COMMON. Xvfb runs with -ac:
+    # xvfb-run keeps its Xauthority file in /tmp, which a snap cannot see
+    # (private /tmp). The first start of a snap builds the font cache, hence
+    # up to 120 s.
+    - name: Smoke-test installed snap
+      env:
+        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        sudo snap install gnome-46-2404
+        sudo snap install --dangerous "${{ steps.build.outputs.snap }}"
+        snap connections yt-downloader-bp
+        for plug in home network; do
+          if ! snap connections yt-downloader-bp | awk -v p="yt-downloader-bp:$plug" '$2 == p && $3 != "-" { ok = 1 } END { exit !ok }'; then
+            echo "Interface '$plug' is not connected"
+            exit 1
+          fi
+        done
+        sudo apt-get update
+        sudo apt-get install -y xvfb
+        Xvfb :99 -screen 0 1280x1024x24 -ac > /dev/null 2>&1 &
+        export DISPLAY=:99
+        LOG="$RUNNER_TEMP/snap-app.log"
+        COMMON="$HOME/snap/yt-downloader-bp/common"
+        snap run yt-downloader-bp > "$LOG" 2>&1 &
+        APP_PID=$!
+        ok=0
+        for i in $(seq 1 24); do
+          sleep 5
+          if ! kill -0 "$APP_PID" 2>/dev/null; then
+            echo "The snap app exited or crashed"
+            break
+          fi
+          if [ -x "$COMMON/yt-dlp" ] && [ -x "$COMMON/ffmpeg_bin/ffmpeg" ]; then
+            ok=1
+            break
+          fi
+        done
+        if [ "$ok" = 1 ]; then
+          echo "yt-dlp and ffmpeg were downloaded to $COMMON and are executable under strict confinement"
+        else
+          echo "Tools not in $COMMON after 120 s (or the app stopped)"
+          ls -la "$COMMON" "$COMMON/ffmpeg_bin" 2>&1 || true
+          cat "$LOG"
+          echo "--- AppArmor / seccomp denials:"
+          sudo dmesg | grep -E 'apparmor="DENIED"|type=1326' | tail -40 || true
+        fi
+        pkill -f yt-downloader-bp || true
+        sudo snap remove --purge yt-downloader-bp
+        [ "$ok" = 1 ]
+
+    - name: Publish to Snap Store (stable)
+      if: env.HAS_SNAP_CREDENTIALS == 'true'
+      uses: snapcore/action-publish@v1
+      env:
+        SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+      with:
+        snap: ${{ steps.build.outputs.snap }}
+        release: stable
+
+    - name: Warn that the snap was not published
+      if: env.HAS_SNAP_CREDENTIALS != 'true'
+      run: echo "::warning::SNAPCRAFT_STORE_CREDENTIALS is not set - the snap was built and tested but not published"
