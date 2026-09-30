@@ -1,0 +1,56 @@
+name: yt-downloader-bp
+title: YouTube Downloader
+summary: Download YouTube videos and audio - a simple desktop app for yt-dlp
+description: |
+  Download videos (MP4, WebM, MKV, up to 4K) or audio only (MP3) from
+  YouTube, several links in one go. The app fetches and updates its own
+  tools (yt-dlp, FFmpeg, Deno) - nothing else to install. Polish and
+  English interface. Files are saved to your Downloads folder, in
+  "YouTube Downloader".
+
+  Pobieranie filmów (MP4, WebM, MKV, do 4K) lub samego dźwięku (MP3) z
+  YouTube, także wielu linków naraz. Aplikacja sama pobiera i aktualizuje
+  swoje narzędzia (yt-dlp, FFmpeg, Deno). Interfejs po polsku i angielsku.
+  Pliki trafiają do folderu Pobrane, do „YouTube Downloader”.
+license: Apache-2.0
+icon: logo.svg
+website: https://github.com/bauerpawel/YouTube-Downloader
+source-code: https://github.com/bauerpawel/YouTube-Downloader
+issues: https://github.com/bauerpawel/YouTube-Downloader/issues
+base: core24
+grade: stable
+confinement: strict
+adopt-info: app
+
+platforms:
+  amd64:
+  arm64:
+
+apps:
+  yt-downloader-bp:
+    command: bin/YouTubeDownloader
+    extensions: [gnome]
+    plugs:
+      - home
+      - network
+
+parts:
+  app:
+    # The single-file binary CI already built and smoke-tested (publish job),
+    # plus version.txt - CI creates snap-bin/, it is not in the repo.
+    plugin: dump
+    source: snap-bin/
+    organize:
+      YouTubeDownloader: bin/YouTubeDownloader
+    prime:
+      - -version.txt
+    # ICU: .NET globalization. OpenSSL: HTTPS in .NET on Linux. ICE/SM: X11
+    # session libraries Avalonia loads (the Linux smoke test installs them too).
+    stage-packages:
+      - libicu74
+      - libssl3t64
+      - libice6
+      - libsm6
+    override-build: |
+      craftctl default
+      craftctl set version="$(cat "$CRAFT_PART_SRC/version.txt")"

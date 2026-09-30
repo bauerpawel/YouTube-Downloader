@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=YouTube Downloader
+Comment=Download YouTube videos and audio
+Comment[pl]=Pobieranie filmów i audio z YouTube
+Exec=yt-downloader-bp
+Icon=${SNAP}/meta/gui/icon.svg
+Terminal=false
+Categories=AudioVideo;Network;

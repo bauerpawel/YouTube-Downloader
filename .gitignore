@@ -16,3 +16,5 @@ downloads/
 .idea/
 *.user
 *.suo
+snap-bin/
+*.snap
