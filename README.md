@@ -4,7 +4,7 @@
 
 <img src="logo.svg" alt="YouTube Downloader Logo" width="480"/>
 
-![Version](https://img.shields.io/badge/Version-2.0.290926-brightgreen)
+![Version](https://img.shields.io/badge/Version-2.0.300926-brightgreen)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-0078D6?logo=windows)
@@ -26,7 +26,7 @@
 
 YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64), zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim i angielskim do wyboru jakości i formatu pobierania.
 
-### 🆕 Co nowego w wersji 2.0.290926
+### 🆕 Co nowego w wersji 2.0.300926
 
 - 🇬🇧 **Wersja angielska** - interfejs po polsku i po angielsku. Przy pierwszym uruchomieniu język dobierany jest do języka systemu (polski system → polski, inny → angielski), zmiana w menu Widok → Język działa od razu i jest zapamiętywana
 - 🔤 **Polskie znaki** - polskie teksty interfejsu pisane są teraz z polskimi znakami („Błąd”, „Narzędzia”, „Jakość”)
@@ -157,13 +157,15 @@ bin/Release/net10.0/win-x64/publish/
 
 ### 🚀 Użytkowanie
 
-1. **Uruchom aplikację** - Otwórz `YouTubeDownloader.exe`
-2. **Wklej URL YouTube** - Skopiuj link do filmu z YouTube i wklej w pole "Adres URL YouTube"
-3. **Wybierz typ zawartości** - "Wideo+Audio" lub "Tylko Audio"
-4. **Wybierz jakość** - Dostępne opcje zależą od filmu
+1. **Uruchom aplikację** - Otwórz pobrany plik (np. `YouTubeDownloader-win-x64.exe`). Przy pierwszym uruchomieniu aplikacja sama pobierze yt-dlp, FFmpeg i Deno
+2. **Wklej link** - Skopiuj link do filmu z YouTube i wklej go w pole "Link do filmu:". Przycisk "+" dodaje kolejne pola, aby pobrać kilka filmów naraz
+3. **Wybierz typ** - "Wideo + Audio" lub "Tylko Audio (MP3)"
+4. **Wybierz jakość** - Od "Najlepsza" do 240p (w trybie audio pole jest nieaktywne)
 5. **Wybierz format** - mp4 (zalecany), webm lub mkv
-6. **Kliknij "Pobierz"** - Aplikacja rozpocznie pobieranie
+6. **Kliknij "Pobierz"** - Aplikacja rozpocznie pobieranie i pokaże postęp
 7. **Pliki w folderze downloads** - Pobrane pliki znajdziesz w folderze `downloads` w katalogu aplikacji
+
+Język interfejsu zmienisz w menu **Widok → Język** (Polski / English). Przy pierwszym uruchomieniu dobierany jest do języka systemu.
 
 ### 🔒 Gatekeeper (macOS)
 
@@ -237,7 +239,7 @@ Zgłoszenia błędów i pull requesty są mile widziane na GitHub.
 
 YouTube Downloader is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish and English interface for selecting download quality and format.
 
-### 🆕 What's New in 2.0.290926
+### 🆕 What's New in 2.0.300926
 
 - 🇬🇧 **English interface** - the UI is available in Polish and English. On first launch the language follows the system language (Polish system → Polish, anything else → English); switch any time in View → Language, it applies immediately and is remembered
 - 🔤 **Polish diacritics** - the Polish UI texts now use proper Polish characters
@@ -368,13 +370,15 @@ bin/Release/net10.0/win-x64/publish/
 
 ### 🚀 Usage
 
-1. **Launch the application** - Open `YouTubeDownloader.exe`
-2. **Paste YouTube URL** - Copy a YouTube video link and paste it in the "Adres URL YouTube" field
-3. **Select content type** - "Wideo+Audio" or "Tylko Audio"
-4. **Select quality** - Available options depend on the video
-5. **Select format** - mp4 (recommended), webm, or mkv
-6. **Click "Pobierz"** - The application will start downloading
-7. **Files in downloads folder** - Downloaded files will be in the `downloads` folder in the application directory
+1. **Launch the application** - Open the downloaded file (e.g. `YouTubeDownloader-win-x64.exe`). On first launch the app downloads yt-dlp, FFmpeg and Deno by itself
+2. **Paste a link** - Copy a YouTube video link and paste it into the "Video link:" field. The "+" button adds more fields to download several videos at once
+3. **Select the type** - "Video + Audio" or "Audio only (MP3)"
+4. **Select the quality** - From "Best" down to 240p (disabled in audio mode)
+5. **Select the format** - mp4 (recommended), webm, or mkv
+6. **Click "Download"** - The application starts downloading and shows the progress
+7. **Files in the downloads folder** - Downloaded files will be in the `downloads` folder in the application directory
+
+The interface language can be changed in **View → Language** (Polski / English). On first launch it follows the system language.
 
 ### 🔒 Gatekeeper (macOS)
 
