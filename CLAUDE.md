@@ -228,8 +228,12 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - Compares `AppUpdater.GetLocalBuildNumber()` with the number after the last `-` in the latest release tag (`v<Version>-<run_number>`). `<Version>` itself (`2.0.ddMMyy`) is not monotonic and is never compared. Every CI build with a higher run number counts as a new version
 - Picks the asset by exact name (`AppUpdater.GetAssetName()`): `YouTubeDownloader-{win-x64,win-arm64}.exe`, `YouTubeDownloader-{linux-x64,linux-arm64}`, `YouTubeDownloader-{osx-x64,osx-arm64}.zip`. A release still being published (asset missing) is treated as "no update yet"
 - If the app folder is not writable, offers the release page in the browser instead
-- Downloads to `<exe>.new` (Windows/Linux) or `YouTubeDownloader-update.zip` extracted to `YouTubeDownloader-update/` (macOS), verifies size (and SHA-256 when the API gives a `digest`), then `AppUpdater.ApplyUpdate()`: every existing target -> `.old`, every new file -> target, full rollback on any failure. The running exe's `.old` on Windows is removed by `AppUpdater.CleanupLeftovers()` on the next start
-- Relaunches `Environment.ProcessPath` and shuts down. The exe file name is never assumed
+- Downloads to `<exe>.new` (Windows/Linux) or `YouTubeDownloader-update.zip` extracted to `YouTubeDownloader-update/` (macOS), verifies size (and SHA-256 when the API gives a `digest`)
+- Windows/Linux (single-file): `AppUpdater.StartSwapAfterExit()` starts a shell that replaces the exe only after the app has exited, then starts it; the app itself just shuts down. Linux: `/bin/sh` waits for the app's PID (`kill -0`), then `mv -f <exe>.new <exe>` and `exec`s it. Windows: `cmd.exe` retries `move /y <exe>.new <exe>` once a second - Windows refuses to replace a running exe, so the move succeeds exactly once the app is gone - then `start`s it; after 2 minutes it starts whatever exe is there. The paths reach sh as positional parameters and cmd as environment variables read with delayed expansion (`!VAR!`), so no path is ever quoted into a script (tested with `(1)`, `%i`, `!b!`, `^`, `&`, `'` in the folder name)
+- **Never replace the running single-file exe in-process.** The runtime reopens the bundle by path every time it loads an assembly for the first time (CoreCLR `PEImage::TryOpenFile` -> `Bundle::AppBundle->Path()`), so after an in-process swap the next new assembly is read from the new file at the old file's offsets and fails with `FileNotFoundException`. That is how 2.0.280926's updater (in-process `.old` swap, then relaunch) failed on Ubuntu: `Process.Start` needed `System.IO.Pipes`, which startup never loads when Deno is already in the data folder, and the relaunch died with "Could not load file or assembly 'System.IO.Pipes'". Reproduced on Windows too with a test app (a different build swapped under a running single-file exe breaks the next first-time assembly load; an identical file does not)
+- macOS (folder, not single-file): `AppUpdater.ApplyUpdate()`: every existing target -> `.old`, every new file -> target, full rollback on any failure, then relaunches `Environment.ProcessPath` and shuts down
+- `AppUpdater.CleanupLeftovers()` removes `<exe>.new`, `<exe>.old` (left on Windows by the older in-process updater) and the macOS update zip/folder on every start
+- The exe file name is never assumed
 - `SetBusy(true)` disables `BtnDownload`, `MiSprawdzAktualizacje` and `MiAktualizujKomponenty` for the whole of `CheckAndDownloadComponents()` (startup tool downloads), `AktualizujKomponenty_Click()`, video downloads and the self-update itself - so an update's final shutdown can never cut a component download short. The startup check runs after `SetBusy(false)` and skips itself whenever `BtnDownload` is disabled
 
 #### 7. About & Message Dialogs
@@ -595,6 +599,6 @@ This project follows standard Git practices:
 
 ---
 
-**Last Updated**: 2026-09-28
+**Last Updated**: 2026-09-30
 **For**: AI Assistants (Claude, etc.)
 **Project**: YouTube Downloader for Windows, Linux, and macOS (.NET 10)

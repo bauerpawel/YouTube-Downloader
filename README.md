@@ -30,6 +30,7 @@ YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64)
 
 - 🇬🇧 **Wersja angielska** - interfejs po polsku i po angielsku. Przy pierwszym uruchomieniu język dobierany jest do języka systemu (polski system → polski, inny → angielski), zmiana w menu Widok → Język działa od razu i jest zapamiętywana
 - 🔤 **Polskie znaki** - polskie teksty interfejsu pisane są teraz z polskimi znakami („Błąd”, „Narzędzia”, „Jakość”)
+- 🐛 **Naprawiony restart po automatycznej aktualizacji** (Windows, Linux) - nowa wersja podmieniana jest dopiero po zamknięciu aplikacji, więc restart nie kończy się już błędem „Could not load file or assembly”. Aktualizacja ze starszej wersji może jeszcze raz pokazać ten komunikat - nowa wersja jest wtedy już zainstalowana, wystarczy uruchomić ją ręcznie
 
 ### 🆕 Co nowego w wersji 2.0.280926
 
@@ -243,6 +244,7 @@ YouTube Downloader is a Windows, Linux, and macOS desktop application built with
 
 - 🇬🇧 **English interface** - the UI is available in Polish and English. On first launch the language follows the system language (Polish system → Polish, anything else → English); switch any time in View → Language, it applies immediately and is remembered
 - 🔤 **Polish diacritics** - the Polish UI texts now use proper Polish characters
+- 🐛 **Fixed restart after an automatic update** (Windows, Linux) - the new version is swapped in only after the app has closed, so the restart no longer fails with "Could not load file or assembly". Updating from an older version may still show that message once - the new version is already installed then, just start it manually
 
 ### 🆕 What's New in 2.0.280926
 

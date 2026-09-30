@@ -1153,6 +1153,11 @@ public partial class MainWindow : Window
             ? Path.Combine(appDirectory, AppUpdater.UpdateZipName)
             : exePath + AppUpdater.NewSuffix;
 
+        // Windows/Linux (single-file): this process must not replace its own file -
+        // a helper does that (and the restart) once we have exited, see
+        // AppUpdater.StartSwapAfterExit.
+        bool swapAfterExit = !OperatingSystem.IsMacOS();
+
         SetBusy(true);
         try
         {
@@ -1162,22 +1167,20 @@ public partial class MainWindow : Window
             if (!AppUpdater.VerifyDownload(downloadPath, asset))
                 throw new InvalidDataException(Ui.ErrorDownloadCorrupt);
 
-            List<(string Source, string Target)> files;
-            if (OperatingSystem.IsMacOS())
+            if (swapAfterExit)
+            {
+                AppUpdater.StartSwapAfterExit(downloadPath, exePath);
+            }
+            else
             {
                 // macOS ships the whole publish folder (not single-file), zipped.
                 string extractDirectory = Path.Combine(appDirectory, AppUpdater.UpdateDirectoryName);
                 AppPaths.TryDeleteDirectory(extractDirectory);
                 ZipFile.ExtractToDirectory(downloadPath, extractDirectory);
-                files = AppUpdater.BuildFileList(extractDirectory, appDirectory);
-            }
-            else
-            {
-                files = new List<(string Source, string Target)> { (downloadPath, exePath) };
-            }
 
-            UpdateStatus(Ui.StatusInstallingAppUpdate);
-            AppUpdater.ApplyUpdate(files);
+                UpdateStatus(Ui.StatusInstallingAppUpdate);
+                AppUpdater.ApplyUpdate(AppUpdater.BuildFileList(extractDirectory, appDirectory));
+            }
         }
         catch (Exception ex)
         {
@@ -1188,18 +1191,23 @@ public partial class MainWindow : Window
             return;
         }
 
-        AppUpdater.DeleteUpdateDownloads(appDirectory, exePath);
         UpdateStatus(Ui.StatusAppUpdatedRestarting);
 
-        try
+        // The helper still needs <exe>.new.
+        if (!swapAfterExit)
         {
-            AppUpdater.Relaunch(exePath);
-        }
-        catch (Exception ex)
-        {
-            await MessageDialog.ShowAsync(this,
-                Ui.AppUpdatedRestartManually(ex.Message),
-                Ui.TitleAppUpdate);
+            AppUpdater.DeleteUpdateDownloads(appDirectory, exePath);
+
+            try
+            {
+                AppUpdater.Relaunch(exePath);
+            }
+            catch (Exception ex)
+            {
+                await MessageDialog.ShowAsync(this,
+                    Ui.AppUpdatedRestartManually(ex.Message),
+                    Ui.TitleAppUpdate);
+            }
         }
 
         if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)

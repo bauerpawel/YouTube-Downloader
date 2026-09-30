@@ -148,10 +148,9 @@ internal static class AppUpdater
             .Select(file => (Source: file, Target: Path.Combine(appDirectory, Path.GetRelativePath(extractedDirectory, file))))
             .ToList();
 
-    // Two phases so a failure anywhere leaves the installed app intact:
+    // macOS only (single-file Windows/Linux use StartSwapAfterExit). Two phases so
+    // a failure anywhere leaves the installed app intact:
     // 1) every existing target -> target.old, 2) every source -> target.
-    // Renaming a running executable is allowed on Windows (overwriting is not);
-    // on Linux/macOS the running process keeps the old inode.
     public static void ApplyUpdate(IReadOnlyList<(string Source, string Target)> files)
     {
         // Before anything is touched, so a failure here costs nothing. The macOS
@@ -199,12 +198,74 @@ internal static class AppUpdater
             throw;
         }
 
-        // Unix lets these go immediately even while in use; on Windows the running
-        // exe's .old stays locked until this process exits and CleanupLeftovers()
-        // removes it on the next start.
+        // Unix lets these go immediately even while in use.
         foreach (string target in backedUp)
             AppPaths.TryDeleteFile(target + OldSuffix);
     }
+
+    // Windows and Linux (single-file). The single-file host reopens its own exe by
+    // path each time an assembly is loaded for the first time (CoreCLR
+    // PEImage::TryOpenFile), so the running process must never see that path
+    // replaced: after an in-process swap the next new assembly (System.IO.Pipes,
+    // for Process.Start on Linux) is read from the new file at the old file's
+    // offsets and fails to load. A shell replaces the exe once this process has
+    // exited and starts it - the old copy if the replacement failed.
+    public static void StartSwapAfterExit(string downloadPath, string executablePath)
+    {
+        AppPaths.MakeExecutable(downloadPath);
+
+        ProcessStartInfo startInfo = OperatingSystem.IsWindows()
+            ? WindowsSwapAfterExit(downloadPath, executablePath)
+            : UnixSwapAfterExit(downloadPath, executablePath);
+        startInfo.UseShellExecute = false;
+        startInfo.CreateNoWindow = true;
+        startInfo.WorkingDirectory = Path.GetDirectoryName(executablePath) ?? "";
+
+        using var process = Process.Start(startInfo);
+    }
+
+    // Waits for this PID, then renames (atomic within one folder). Positional
+    // parameters ($1..$3), so no path ever needs shell quoting.
+    private const string UnixSwapScript =
+        "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; mv -f \"$2\" \"$3\"; exec \"$3\"";
+
+    private static ProcessStartInfo UnixSwapAfterExit(string downloadPath, string executablePath) =>
+        new("/bin/sh")
+        {
+            ArgumentList =
+            {
+                "-c", UnixSwapScript, "sh",
+                Environment.ProcessId.ToString(CultureInfo.InvariantCulture),
+                downloadPath, executablePath
+            }
+        };
+
+    // cmd cannot wait for a PID and needs not: Windows refuses to replace an exe
+    // that is still running, so `move` succeeds exactly once the app is gone.
+    // Retried once a second; after two minutes it starts whatever exe is there.
+    // Every value is read with delayed expansion (!VAR!), which inserts it
+    // verbatim after all other parsing - a folder name with %, !, ^ or & stays
+    // intact. ping by full path: cmd looks in the current directory (the app
+    // folder, maybe Downloads) before PATH. The loop needs its own parentheses,
+    // otherwise cmd takes the trailing `& start` as part of the loop body.
+    private const string WindowsSwapScript =
+        "(for /l %i in (1,1,120) do @(" +
+            "move /y \"!YTD_UPDATE_SOURCE!\" \"!YTD_UPDATE_TARGET!\" >nul 2>&1" +
+            " && (start \"\" \"!YTD_UPDATE_TARGET!\" & exit)" +
+            " & \"!SystemRoot!\\System32\\PING.EXE\" -n 2 127.0.0.1 >nul" +
+        ")) & start \"\" \"!YTD_UPDATE_TARGET!\"";
+
+    private static ProcessStartInfo WindowsSwapAfterExit(string downloadPath, string executablePath) =>
+        new(Path.Combine(Environment.SystemDirectory, "cmd.exe"))
+        {
+            // /s: cmd strips only the outer quotes and runs the rest as written.
+            Arguments = "/d /v:on /s /c \"" + WindowsSwapScript + "\"",
+            Environment =
+            {
+                ["YTD_UPDATE_SOURCE"] = downloadPath,
+                ["YTD_UPDATE_TARGET"] = executablePath
+            }
+        };
 
     public static void Relaunch(string executablePath)
     {
