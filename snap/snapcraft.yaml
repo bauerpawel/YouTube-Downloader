@@ -46,11 +46,14 @@ parts:
       - -version.txt
     # ICU: .NET globalization. OpenSSL: HTTPS in .NET on Linux. ICE/SM: X11
     # session libraries Avalonia loads (the Linux smoke test installs them too).
+    # xz: the app unpacks FFmpeg's .tar.xz with the system tar, which runs xz
+    # from PATH - core24 has tar but no xz.
     stage-packages:
       - libicu74
       - libssl3t64
       - libice6
       - libsm6
+      - xz-utils
     override-build: |
       craftctl default
       craftctl set version="$(cat "$CRAFT_PART_SRC/version.txt")"
