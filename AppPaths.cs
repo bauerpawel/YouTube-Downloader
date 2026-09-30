@@ -41,7 +41,24 @@ internal static class AppPaths
     // Next to the app, except in a snap: $SNAP is read-only there.
     public static string DownloadsDirectory => downloadsDirectory.Value;
 
-    public static bool IsSnap => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SNAP"));
+    private static readonly Lazy<bool> isSnap = new(() =>
+        IsRunningFromSnap(Environment.GetEnvironmentVariable("SNAP"), AppContext.BaseDirectory));
+
+    // SNAP alone is no proof: a snap terminal (VS Code, ...) leaks its SNAP*
+    // variables into everything started from it, the plain Linux build included -
+    // which would then turn self-update off and write into that other snap's
+    // folders. Our own snap runs the exe from under $SNAP.
+    public static bool IsSnap => isSnap.Value;
+
+    public static bool IsRunningFromSnap(string? snap, string appDirectory)
+    {
+        if (string.IsNullOrEmpty(snap))
+            return false;
+
+        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(snap)) + Path.DirectorySeparatorChar;
+        string app = Path.TrimEndingDirectorySeparator(Path.GetFullPath(appDirectory)) + Path.DirectorySeparatorChar;
+        return app.StartsWith(root, StringComparison.Ordinal);
+    }
 
     public static string ResolveDataDirectory(string? snapUserCommon, string localAppData, string appDirectory)
     {
@@ -112,7 +129,7 @@ internal static class AppPaths
     {
         string appDirectory = AppContext.BaseDirectory;
         string directory = ResolveDataDirectory(
-            Environment.GetEnvironmentVariable("SNAP_USER_COMMON"),
+            IsSnap ? Environment.GetEnvironmentVariable("SNAP_USER_COMMON") : null,
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             appDirectory);
 

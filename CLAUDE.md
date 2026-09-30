@@ -229,7 +229,7 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 
 **CheckForAppUpdate(bool silent) / InstallAppUpdate()** (app self-update, logic in `AppUpdater.cs`)
 - Runs silently at the end of `CheckAndDownloadComponents()` and loudly from `MiSprawdzAktualizacje`. Silent mode never shows errors (offline, GitHub API rate limit)
-- Off inside a snap (`AppPaths.IsSnap` - the Snap Store updates it) and for local builds (no `BuildNumber` metadata)
+- Off inside a snap (`AppPaths.IsSnap` - the Snap Store updates it) and for local builds (no `BuildNumber` metadata). `IsSnap` is true only when the exe runs from under `$SNAP` (`AppPaths.IsRunningFromSnap()`), not merely when `SNAP` is set: a snap terminal (VS Code, ...) leaks its `SNAP*` variables into the plain Linux build started from it, which would otherwise turn self-update off and use that other snap's `SNAP_USER_COMMON` as its data folder
 - Compares `AppUpdater.GetLocalBuildNumber()` with the number after the last `-` in the latest release tag (`v<Version>-<run_number>`). `<Version>` itself (`2.0.ddMMyy`) is not monotonic and is never compared. Every CI build with a higher run number counts as a new version
 - Picks the asset by exact name (`AppUpdater.GetAssetName()`): `YouTubeDownloader-{win-x64,win-arm64}.exe`, `YouTubeDownloader-{linux-x64,linux-arm64}`, `YouTubeDownloader-{osx-x64,osx-arm64}.zip`. A release still being published (asset missing) is treated as "no update yet"
 - If the app folder is not writable, offers the release page in the browser instead
