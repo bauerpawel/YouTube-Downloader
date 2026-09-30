@@ -218,17 +218,22 @@ Bez nowych tekstów w `Strings.cs`.
      - `sudo snap install gnome-46-2404`, potem
        `sudo snap install --dangerous <snap>`;
      - `snap connections yt-downloader-bp` - `home` i `network` podłączone;
-     - `apt-get install xvfb`, `xvfb-run --auto-servernum yt-downloader-bp`
-       w tle, po 60 s proces nadal działa;
-     - `~/snap/yt-downloader-bp/common/yt-dlp` i
-       `~/snap/yt-downloader-bp/common/ffmpeg_bin/ffmpeg` istnieją i są
-       wykonywalne; przy porażce wypisanie `app.log` i zawartości katalogów;
+     - `Xvfb :99 -ac` w tle (bez kontroli dostępu: `xvfb-run` trzyma plik
+       Xauthority w `/tmp`, a snap ma prywatny `/tmp`), potem
+       `DISPLAY=:99 snap run yt-downloader-bp` w tle;
+     - do 120 s (sprawdzanie co 5 s - pierwszy start snapa buduje cache
+       czcionek): proces nadal działa, a `~/snap/yt-downloader-bp/common/yt-dlp`
+       i `~/snap/yt-downloader-bp/common/ffmpeg_bin/ffmpeg` istnieją i są
+       wykonywalne; przy porażce wypisanie logu aplikacji i zawartości katalogów;
      - zakończenie procesu i `sudo snap remove --purge yt-downloader-bp`.
   6. `snapcore/action-publish@v1` z `env: SNAPCRAFT_STORE_CREDENTIALS`,
-     `snap: ${{ steps.build.outputs.snap }}`, `release: stable`. Wykonywany
-     tylko gdy sekret jest ustawiony (sekret mapowany na zmienną env joba i
-     warunek `if: env.SNAPCRAFT_STORE_CREDENTIALS != ''`); bez sekretu krok
-     jest pomijany, a osobny krok wypisuje ostrzeżenie `::warning::`.
+     `snap: ${{ steps.build.outputs.snap }}`, `release: stable`. Sekret trafia
+     **tylko do env tego kroku** - test dymny uruchamia pobrane z internetu
+     yt-dlp i Deno, które dziedziczą środowisko. Warunek kroku: zmienna joba
+     `HAS_SNAP_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS != '' }}`
+     (sam wynik porównania, nie sekret) i `if: env.HAS_SNAP_CREDENTIALS ==
+     'true'`; bez sekretu krok jest pomijany, a osobny krok wypisuje
+     ostrzeżenie `::warning::`.
 
 ### CLAUDE.md / README.md
 
@@ -266,6 +271,12 @@ Bez nowych tekstów w `Strings.cs`.
   ustawiony).
 - CI: test dymny zainstalowanego snapa na amd64 i arm64 (confinement, pobranie
   i uruchomienie narzędzi, interfejsy).
+- Przed scaleniem: job `snap` zależy od `publish`, który nie działa w PR,
+  więc pakowanie i test dymny sprawdza tymczasowy workflow
+  `.github/workflows/snap-verify.yml` uruchamiany pushem gałęzi
+  `claude/snap-store` - te same kroki, plik single-file z najnowszego
+  release'u, bez publikacji. Usuwany przed scaleniem (precedens: tymczasowy
+  workflow macOS w `8da3933`/`30df83f`).
 - Ręcznie (właściciel, Ubuntu): `sudo snap install yt-downloader-bp`,
   pobranie jednego filmu → plik w `~/Pobrane/YouTube Downloader`; menu
   „Sprawdź aktualizacje aplikacji” → komunikat o Snap Store; okno
