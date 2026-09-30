@@ -33,6 +33,8 @@ YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64)
 - 🐛 **Naprawiony restart po automatycznej aktualizacji** (Windows, Linux) - nowa wersja podmieniana jest dopiero po zamknięciu aplikacji, więc restart nie kończy się już błędem „Could not load file or assembly”. Aktualizacja ze starszej wersji może jeszcze raz pokazać ten komunikat - nowa wersja jest wtedy już zainstalowana, wystarczy uruchomić ją ręcznie
 - 🐧 **Snap Store** - aplikacja jest dostępna jako snap: `sudo snap install yt-downloader-bp` (amd64 i arm64), aktualizowana automatycznie przez Snap Store. Pobrane pliki trafiają do folderu Pobrane, do „YouTube Downloader”
 - 🐛 **Naprawione użycie Deno na Linuksie i macOS** - yt-dlp dostaje teraz ścieżkę do Deno pobranego przez aplikację. Wcześniej go nie znajdował i pobierał z YouTube bez silnika JavaScript, przez co część filmów lub formatów mogła być niedostępna
+- 🐛 **Pobieranie nie zawiesza się** - gdy yt-dlp lub tar wypisywały dużo komunikatów, narzędzie zatrzymywało się w połowie pobierania albo rozpakowywania, a aplikacja czekała na nie w nieskończoność
+- 🐛 **Linux: uruchomienie z terminala innego snapa** (np. VS Code) nie jest już mylone z wersją snap - wcześniej wyłączało to automatyczną aktualizację i zapisywało narzędzia w folderze tamtego snapa
 
 ### 🆕 Co nowego w wersji 2.0.280926
 
@@ -261,6 +263,8 @@ YouTube Downloader is a Windows, Linux, and macOS desktop application built with
 - 🐛 **Fixed restart after an automatic update** (Windows, Linux) - the new version is swapped in only after the app has closed, so the restart no longer fails with "Could not load file or assembly". Updating from an older version may still show that message once - the new version is already installed then, just start it manually
 - 🐧 **Snap Store** - the app is available as a snap: `sudo snap install yt-downloader-bp` (amd64 and arm64), updated automatically by the Snap Store. Downloads go to your Downloads folder, in "YouTube Downloader"
 - 🐛 **Fixed Deno on Linux and macOS** - yt-dlp now gets the path of the Deno the app downloads. Before, it could not find it and downloaded from YouTube without a JavaScript runtime, so some videos or formats could be unavailable
+- 🐛 **Downloads no longer hang** - when yt-dlp or tar printed a lot of messages, the app could wait forever for a download or an extraction
+- 🐛 **Linux: started from another snap's terminal** (e.g. VS Code) is no longer mistaken for the snap version - that used to turn off automatic updates and store the tools in that other snap's folder
 
 ### 🆕 What's New in 2.0.280926
 
