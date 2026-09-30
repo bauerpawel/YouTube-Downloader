@@ -15,6 +15,17 @@ internal static class YtDlpArguments
         _ => $"{maxHeight}p"
     };
 
+    // Always with the runtime's path: outside Windows yt-dlp looks for "deno" /
+    // "node" only on PATH (on Windows also next to itself), and the app's own
+    // runtime lives in the data folder - without the path yt-dlp ran with
+    // "JS runtimes: none" on Linux, macOS and in the snap.
+    public static string JsRuntime(string runtimePath)
+    {
+        string name = Path.GetFileNameWithoutExtension(runtimePath)
+            .Equals("deno", StringComparison.OrdinalIgnoreCase) ? "deno" : "node";
+        return $"--js-runtimes \"{name}:{runtimePath}\"";
+    }
+
     public static string Build(bool audioOnly, int? maxHeight, string format)
     {
         if (audioOnly)

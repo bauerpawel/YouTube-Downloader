@@ -136,6 +136,7 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - `FindSystemDeno()` shells out to `where deno` (Windows) / `which deno` (Linux/macOS) and returns the first hit that **exists and lies outside the app folder** (`AppPaths.PickFirstPathOutside()`): `where` searches the current directory first, which for a double-clicked app is the app folder - an old `deno.exe` left there by a pre-2.0.280926 version must not count as system-wide. A GUI app also receives `where` output in the OEM code page decoded as ANSI, so a non-ASCII path (`C:\Users\Michał\Downloads`) comes back mangled and would no longer match the app folder - the `File.Exists` check drops such lines. `where` also prints every match on its own line, so the raw output is never used as a path
 - `IsRuntimeInPath()` (called from `CheckAndDownloadComponents()` to decide whether Deno must be auto-downloaded) is `FindSystemDeno() != ""`
 - `GetRuntimePath()` (used to build the yt-dlp `--js-runtimes` invocation) returns the data-folder `denoPath`, then `nodeJsPath` (data folder first, then app folder), then `FindSystemDeno()`
+- `YtDlpArguments.JsRuntime()` always passes that runtime **with its path** (`--js-runtimes "deno:<path>"` / `"node:<path>"`): outside Windows yt-dlp looks for `deno`/`node` only on `PATH` (on Windows also next to `yt-dlp.exe`), and the data folder is not on `PATH`. Without the path yt-dlp reported `JS runtimes: none` on Linux, macOS and in the snap (versions 2.0.280926-2.0.300926 build 28)
 - `CheckAndUpdateDeno()` (used by the "Update Components" menu action) does **not** shell out at all: it only checks `File.Exists(denoPath)` as a local proxy - if the app's own managed `deno` binary isn't present, it assumes a system/external runtime is in use and skips the version-check/update entirely
 
 **GetDenoAssetName() / DownloadDeno() / GetLatestDenoInfo()**
@@ -390,7 +391,7 @@ Common arguments:
 - `--ffmpeg-location "path/to/ffmpeg_bin"` - FFmpeg location
 - `--progress --newline` - Progress reporting
 - `-o "<AppPaths.DownloadsDirectory>/%(title)s.%(ext)s"` - Output pattern
-- `--js-runtimes node` - If using Node.js instead of Deno
+- `--js-runtimes "deno:<path>"` (or `"node:<path>"`) - The JS runtime from `GetRuntimePath()`, always with its path (`YtDlpArguments.JsRuntime()`)
 
 ### Progress Parsing
 The application parses yt-dlp output using regex patterns:

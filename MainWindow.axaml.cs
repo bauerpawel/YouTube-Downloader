@@ -988,18 +988,12 @@ public partial class MainWindow : Window
         try
         {
             string normalizedUrl = NormalizeUrl(rawUrl);
-            string denoExeName = OperatingSystem.IsWindows() ? "deno.exe" : "deno";
-            string jsRuntimeArg = runtimePath.EndsWith(denoExeName, StringComparison.OrdinalIgnoreCase) ? "" : "--js-runtimes node";
             string ytDlpArgs = BuildYtDlpArguments();
             string downloadsDir = AppPaths.DownloadsDirectory;
             string outputPattern = Path.Combine(downloadsDir, "%(title)s.%(ext)s");
 
             StringBuilder argBuilder = new StringBuilder();
-            if (!string.IsNullOrEmpty(jsRuntimeArg))
-            {
-                argBuilder.Append(jsRuntimeArg);
-                argBuilder.Append(" ");
-            }
+            argBuilder.Append(YtDlpArguments.JsRuntime(runtimePath));
             argBuilder.Append(ytDlpArgs);
             argBuilder.Append(" --ffmpeg-location \"");
             argBuilder.Append(ffmpegBinPath);
