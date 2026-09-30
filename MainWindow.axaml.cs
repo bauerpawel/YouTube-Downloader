@@ -953,7 +953,7 @@ public partial class MainWindow : Window
         SetUrlRowsEnabled(false);
 
         int successCount = 0;
-        string downloadsDir = Path.Combine(appDirectory, "downloads");
+        string downloadsDir = AppPaths.DownloadsDirectory;
 
         for (int i = 0; i < rawUrls.Count; i++)
         {
@@ -991,7 +991,7 @@ public partial class MainWindow : Window
             string denoExeName = OperatingSystem.IsWindows() ? "deno.exe" : "deno";
             string jsRuntimeArg = runtimePath.EndsWith(denoExeName, StringComparison.OrdinalIgnoreCase) ? "" : "--js-runtimes node";
             string ytDlpArgs = BuildYtDlpArguments();
-            string downloadsDir = Path.Combine(appDirectory, "downloads");
+            string downloadsDir = AppPaths.DownloadsDirectory;
             string outputPattern = Path.Combine(downloadsDir, "%(title)s.%(ext)s");
 
             StringBuilder argBuilder = new StringBuilder();

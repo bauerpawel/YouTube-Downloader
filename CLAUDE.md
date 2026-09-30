@@ -50,7 +50,7 @@ YouTube-Downloader/
 
 The app keeps two locations apart (`AppPaths.cs`):
 
-- **App folder** (`AppPaths.AppDirectory`, where the executable lives) holds only the app itself and `downloads/`. Self-update replaces files here and nothing else.
+- **App folder** (`AppPaths.AppDirectory`, where the executable lives) holds only the app itself and `downloads/`. Self-update replaces files here and nothing else. Inside a snap the app folder (`$SNAP`) is read-only, so `AppPaths.DownloadsDirectory` points to the user's Downloads folder instead: the `XDG_DOWNLOAD_DIR` from `$SNAP_REAL_HOME/.config/user-dirs.dirs` (e.g. `~/Pobrane`), falling back to `~/Downloads`, plus `YouTube Downloader`.
 - **Data folder** (`AppPaths.DataDirectory`) holds everything the app downloads or writes: `%LOCALAPPDATA%\YouTubeDownloader` (Windows), `~/.local/share/YouTubeDownloader` (Linux, honours `XDG_DATA_HOME`), `~/Library/Application Support/YouTubeDownloader` (macOS), `$SNAP_USER_COMMON` inside a snap. Falls back to the app folder if the per-user location is unavailable.
 
 On Windows:
@@ -383,7 +383,7 @@ The application passes specific arguments based on user selections:
 Common arguments:
 - `--ffmpeg-location "path/to/ffmpeg_bin"` - FFmpeg location
 - `--progress --newline` - Progress reporting
-- `-o "downloads/%(title)s.%(ext)s"` - Output pattern
+- `-o "<AppPaths.DownloadsDirectory>/%(title)s.%(ext)s"` - Output pattern
 - `--js-runtimes node` - If using Node.js instead of Deno
 
 ### Progress Parsing
@@ -415,8 +415,8 @@ The application parses yt-dlp output using regex patterns:
 ### Modifying Existing Features
 
 1. **Change Download Location**:
-   - The `downloadsDir` computation (`Path.Combine(appDirectory, "downloads")`) appears in both `BtnDownload_Click()` and `DownloadSingleUrlAsync()` in `MainWindow.axaml.cs` - update both
-   - Update the user-facing success message that reports the location
+   - `AppPaths.DownloadsDirectory` is the only place that decides it (`ResolveDownloadsDirectory()` - next to the app, or the XDG Downloads folder inside a snap); `BtnDownload_Click()` and `DownloadSingleUrlAsync()` both read it
+   - The success message reports whatever path it returns
 
 2. **Update UI Text/Language**:
    - Add/change the property in `Strings.cs` and set it in **both** instances

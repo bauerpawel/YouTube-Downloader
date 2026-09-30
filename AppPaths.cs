@@ -27,9 +27,18 @@ internal static class AppPaths
 
     private static readonly Lazy<string> dataDirectory = new(CreateDataDirectory);
 
+    private static readonly Lazy<string> downloadsDirectory = new(() => ResolveDownloadsDirectory(
+        IsSnap,
+        AppContext.BaseDirectory,
+        Environment.GetEnvironmentVariable("SNAP_REAL_HOME"),
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
+
     public static string AppDirectory { get; } = AppContext.BaseDirectory;
 
     public static string DataDirectory => dataDirectory.Value;
+
+    // Next to the app, except in a snap: $SNAP is read-only there.
+    public static string DownloadsDirectory => downloadsDirectory.Value;
 
     public static bool IsSnap => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SNAP"));
 
@@ -42,6 +51,55 @@ internal static class AppPaths
             return appDirectory;
 
         return Path.Combine(localAppData, DataFolderName);
+    }
+
+    // Inside a snap: the user's Downloads folder (the desktop interface may read
+    // ~/.config/user-dirs.dirs, the home interface may write there) plus a
+    // folder of our own. $HOME is ~/snap/<name>/<revision> there; snapd passes
+    // the real one in SNAP_REAL_HOME.
+    public const string SnapDownloadsFolderName = "YouTube Downloader";
+
+    public static string ResolveDownloadsDirectory(bool isSnap, string appDirectory, string? snapRealHome, string userProfile)
+    {
+        if (!isSnap)
+            return Path.Combine(appDirectory, "downloads");
+
+        string realHome = string.IsNullOrEmpty(snapRealHome) ? userProfile : snapRealHome;
+        string? userDirs = TryReadAllText(Path.Combine(realHome, ".config", "user-dirs.dirs"));
+        return Path.Combine(ResolveUserDownloadDirectory(userDirs, realHome), SnapDownloadsFolderName);
+    }
+
+    // xdg-user-dirs format: XDG_DOWNLOAD_DIR="$HOME/Pobrane" or an absolute path;
+    // "$HOME" alone means the folder is disabled. The last assignment wins, as in
+    // the shell. Shell escapes are not handled - xdg-user-dirs does not write
+    // them for ordinary folder names.
+    public static string ResolveUserDownloadDirectory(string? userDirsContent, string realHome)
+    {
+        const string key = "XDG_DOWNLOAD_DIR=";
+        const string homePrefix = "$HOME/";
+        string fallback = Path.Combine(realHome, "Downloads");
+
+        string? value = null;
+        foreach (string line in (userDirsContent ?? "").Split('\n'))
+        {
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith(key, StringComparison.Ordinal))
+                value = trimmed[key.Length..];
+        }
+
+        if (value == null)
+            return fallback;
+
+        if (value.Length >= 2 && value[0] == '"' && value[^1] == '"')
+            value = value[1..^1];
+
+        if (value.StartsWith(homePrefix, StringComparison.Ordinal))
+        {
+            string relative = value[homePrefix.Length..].Trim('/');
+            return relative.Length == 0 ? fallback : Path.Combine(realHome, relative);
+        }
+
+        return value.StartsWith('/') ? value : fallback;
     }
 
     private static string CreateDataDirectory()
@@ -152,6 +210,18 @@ internal static class AppPaths
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return !Directory.Exists(path);
+        }
+    }
+
+    private static string? TryReadAllText(string path)
+    {
+        try
+        {
+            return File.ReadAllText(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
         }
     }
 }
