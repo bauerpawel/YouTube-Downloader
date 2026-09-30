@@ -354,10 +354,13 @@ jobs:
   # Snap Store package yt-downloader-bp (docs/superpowers/specs/2026-09-30-snap-store-design.md).
   # Packs the linux single-file binaries the publish job just built and
   # smoke-tested, tests the installed snap, then releases it to stable. Runs
-  # after publish, so a failing snap never holds back the GitHub Release.
+  # after publish, so a failing snap never holds back the GitHub Release. The
+  # other way round, `needs: publish` waits for all six publish legs: a failed
+  # macOS leg skips the snap too - re-run the failed jobs to publish it.
   snap:
     needs: publish
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # not on forked PRs
+    timeout-minutes: 60
 
     strategy:
       fail-fast: false
@@ -398,7 +401,6 @@ jobs:
       with:
         name: YouTubeDownloader-${{ matrix.rid }}
         path: snap-bin
-
 
     - name: Prepare snap-bin (binary + version)
       run: |
@@ -463,6 +465,8 @@ jobs:
             set -e
             "$SNAP_USER_COMMON/yt-dlp" --version
             "$SNAP_USER_COMMON/deno" --version
+            # yt-dlp must see the app'"'"'s Deno, passed the way the app passes it
+            "$SNAP_USER_COMMON/yt-dlp" -v --js-runtimes "deno:$SNAP_USER_COMMON/deno" 2>&1 | grep "JS runtimes: deno-"
             "$SNAP_USER_COMMON/ffmpeg_bin/ffmpeg" -version | head -1
             "$SNAP_USER_COMMON/ffmpeg_bin/ffprobe" -version | head -1
             grep XDG_DOWNLOAD_DIR "$SNAP_REAL_HOME/.config/user-dirs.dirs"

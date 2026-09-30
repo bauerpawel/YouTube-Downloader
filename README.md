@@ -166,7 +166,7 @@ bin/Release/net10.0/win-x64/publish/
 sudo snap install yt-downloader-bp
 ```
 
-Wersję snap aktualizuje Snap Store (automatyczna aktualizacja w samej aplikacji jest w niej wyłączona). Pobrane pliki trafiają do systemowego folderu pobranych, do podfolderu `YouTube Downloader` (np. `~/Pobrane/YouTube Downloader`).
+Wersję snap aktualizuje Snap Store (automatyczna aktualizacja w samej aplikacji jest w niej wyłączona). Pobrane pliki trafiają do systemowego folderu pobranych, do podfolderu `YouTube Downloader` (np. `~/Pobrane/YouTube Downloader`). Jeśli folder pobranych leży na innym dysku (`/media`, `/mnt` - także przez dowiązanie z `~/Pobrane`), zezwól na to raz: `sudo snap connect yt-downloader-bp:removable-media`.
 
 ### 🚀 Użytkowanie
 
@@ -393,7 +393,7 @@ bin/Release/net10.0/win-x64/publish/
 sudo snap install yt-downloader-bp
 ```
 
-The snap is updated by the Snap Store (the in-app self-update is off there). Downloads go to your system Downloads folder, into a `YouTube Downloader` subfolder (e.g. `~/Downloads/YouTube Downloader`).
+The snap is updated by the Snap Store (the in-app self-update is off there). Downloads go to your system Downloads folder, into a `YouTube Downloader` subfolder (e.g. `~/Downloads/YouTube Downloader`). If your Downloads folder is on another drive (`/media`, `/mnt` - also via a symlink from `~/Downloads`), allow it once: `sudo snap connect yt-downloader-bp:removable-media`.
 
 ### 🚀 Usage
 

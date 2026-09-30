@@ -33,6 +33,10 @@ apps:
     plugs:
       - home
       - network
+      # Downloads folder on another drive (/media, /mnt - also via a symlink
+      # from ~/Downloads): not auto-connected, the user runs
+      # `sudo snap connect yt-downloader-bp:removable-media` once.
+      - removable-media
 
 parts:
   app:
