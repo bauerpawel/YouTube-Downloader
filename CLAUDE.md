@@ -34,6 +34,7 @@ YouTube-Downloader/
 ├── Strings.cs                   # Every UI text, Polish + English instances (required members)
 ├── LanguageSettings.cs          # Resolves/loads/saves the UI language (language.txt, data folder)
 ├── YtDlpArguments.cs            # yt-dlp format args from quality values (not display text)
+├── ProcessRunner.cs             # Runs a tool with stdout/stderr drained while it runs (no Avalonia)
 ├── Assets/
 │   └── app-logo.png             # Application logo, shown in About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
@@ -350,10 +351,9 @@ This environment has no full GUI test automation - there is no headless/CI-runna
 - Graceful fallbacks for missing dependencies
 
 ### Process Execution
-- `ProcessStartInfo` with redirected output streams
+- Run tools whose output is redirected through `ProcessRunner.RunAsync(startInfo, onOutputLine)`: it redirects both streams, hands stdout lines to the callback (`OutputDataReceived`) and reads stderr **while** the tool runs, then returns `(ExitCode, StandardError)`. Never redirect a stream and read it only after `WaitForExitAsync()` (or not at all): the pipe fills (a few KB on Windows) and the tool blocks forever - yt-dlp downloads, `tar` and `yt-dlp -U` all did that before 2.0.300926 build 29
 - `CreateNoWindow = true` for background processes
-- `UseShellExecute = false` for output capture
-- Event-based output parsing with `OutputDataReceived`
+- The one exception is `FindSystemDeno()`: it redirects stdout only and reads it to the end before `WaitForExit()`, which is safe
 
 ## Important Implementation Details
 
@@ -462,18 +462,16 @@ UpdateStatus(Ui.StatusFileCount(n));       // with values: a Func<> property in 
 
 **Executing external command**:
 ```csharp
-var processInfo = new ProcessStartInfo
+var startInfo = new ProcessStartInfo
 {
     FileName = "executable.exe",
     Arguments = "args",
-    UseShellExecute = false,
-    RedirectStandardOutput = true,
     CreateNoWindow = true
 };
-using (var process = Process.Start(processInfo))
-{
-    await process.WaitForExitAsync();
-}
+// Both streams are drained while it runs - see Process Execution.
+var (exitCode, error) = await ProcessRunner.RunAsync(startInfo, line => { /* stdout line */ });
+if (exitCode != 0)
+    throw new Exception(error);
 ```
 
 ## AI Assistant Guidelines

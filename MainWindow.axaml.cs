@@ -538,25 +538,16 @@ public partial class MainWindow : Window
         var processInfo = new ProcessStartInfo
         {
             FileName = "tar",
-            UseShellExecute = false,
-            CreateNoWindow = true,
-            RedirectStandardError = true
+            CreateNoWindow = true
         };
         processInfo.ArgumentList.Add("-xf");
         processInfo.ArgumentList.Add(archivePath);
         processInfo.ArgumentList.Add("-C");
         processInfo.ArgumentList.Add(destinationPath);
 
-        using var process = Process.Start(processInfo);
-        if (process == null)
-            throw new Exception(Ui.ErrorTarStart);
-
-        await process.WaitForExitAsync();
-        if (process.ExitCode != 0)
-        {
-            string error = await process.StandardError.ReadToEndAsync();
+        var (exitCode, error) = await ProcessRunner.RunAsync(processInfo);
+        if (exitCode != 0)
             throw new Exception(Ui.ErrorTarFailed(error));
-        }
     }
 
     private async Task DownloadFFmpeg()
@@ -779,20 +770,12 @@ public partial class MainWindow : Window
             {
                 try
                 {
-                    var processInfo = new ProcessStartInfo
+                    await ProcessRunner.RunAsync(new ProcessStartInfo
                     {
                         FileName = ytDlpPath,
                         Arguments = "-U",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
                         CreateNoWindow = true
-                    };
-
-                    using (var process = Process.Start(processInfo))
-                    {
-                        if (process != null)
-                            await process.WaitForExitAsync();
-                    }
+                    });
                     UpdateStatus(Ui.StatusYtDlpUpdated);
                 }
                 catch (Exception ex)
@@ -1007,39 +990,30 @@ public partial class MainWindow : Window
             {
                 FileName = ytDlpPath,
                 Arguments = argBuilder.ToString(),
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
                 CreateNoWindow = true
             };
 
             Directory.CreateDirectory(downloadsDir);
 
-            using var process = new Process { StartInfo = processInfo };
-            process.OutputDataReceived += (s, args) =>
+            var (exitCode, error) = await ProcessRunner.RunAsync(processInfo, data =>
             {
-                if (!string.IsNullOrEmpty(args.Data))
+                if (data.Length == 0)
+                    return;
+
+                Dispatcher.UIThread.Post(() =>
                 {
-                    string data = args.Data;
-                    Dispatcher.UIThread.Post(() =>
+                    if (data.Contains("[download]"))
                     {
-                        if (data.Contains("[download]"))
-                        {
-                            ParseDownloadProgress(data, statusPrefix);
-                        }
-                        else if (data.Contains("[info]") || data.Contains("Downloading"))
-                        {
-                            LblStatus.Text = statusPrefix + data;
-                        }
-                    });
-                }
-            };
+                        ParseDownloadProgress(data, statusPrefix);
+                    }
+                    else if (data.Contains("[info]") || data.Contains("Downloading"))
+                    {
+                        LblStatus.Text = statusPrefix + data;
+                    }
+                });
+            });
 
-            process.Start();
-            process.BeginOutputReadLine();
-            await process.WaitForExitAsync();
-
-            if (process.ExitCode == 0)
+            if (exitCode == 0)
             {
                 ProgressBarDownload.Value = 100;
                 UpdateStatus(statusPrefix + Ui.StatusDownloaded);
@@ -1047,7 +1021,6 @@ public partial class MainWindow : Window
             }
             else
             {
-                string error = await process.StandardError.ReadToEndAsync();
                 UpdateStatus(statusPrefix + Ui.StatusDownloadError);
                 await MessageDialog.ShowAsync(this, Ui.ErrorDownloadFailed(rawUrl, error), Ui.TitleError);
                 return false;

@@ -211,6 +211,7 @@ YouTube-Downloader/
 ├── Strings.cs                   # Teksty interfejsu po polsku i angielsku
 ├── LanguageSettings.cs          # Wybór i zapis języka (language.txt)
 ├── YtDlpArguments.cs            # Argumenty yt-dlp dla jakości/formatu
+├── ProcessRunner.cs             # Uruchamianie narzędzi (yt-dlp, tar) bez blokowania na wyjściu
 ├── Assets/
 │   └── app-logo.png             # Logo aplikacji, widoczne w oknie Informacje i oknach komunikatów
 ├── YouTubeDownloader.csproj     # Konfiguracja projektu .NET 10 (pakiety Avalonia)
@@ -438,6 +439,7 @@ YouTube-Downloader/
 ├── Strings.cs                   # UI texts in Polish and English
 ├── LanguageSettings.cs          # Language choice and persistence (language.txt)
 ├── YtDlpArguments.cs            # yt-dlp arguments for quality/format
+├── ProcessRunner.cs             # Runs tools (yt-dlp, tar) without blocking on their output
 ├── Assets/
 │   └── app-logo.png             # Application logo, shown in About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)

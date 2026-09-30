@@ -106,7 +106,6 @@ internal sealed class Strings
     public required Func<string, string> ErrorFFmpeg { get; init; }
     public required string ErrorFFmpegLinkNotFound { get; init; }
     public required string ErrorFFmpegBinNotFound { get; init; }
-    public required string ErrorTarStart { get; init; }
     public required Func<string, string> ErrorTarFailed { get; init; }
     public required Func<string, string> ErrorDenoUpdate { get; init; }
     public required Func<string, string> ErrorUpdate { get; init; }
@@ -221,7 +220,6 @@ internal sealed class Strings
         ErrorFFmpeg = error => "Błąd FFmpeg: " + error,
         ErrorFFmpegLinkNotFound = "Nie znaleziono linku do FFmpeg",
         ErrorFFmpegBinNotFound = "Nie znaleziono folderu bin",
-        ErrorTarStart = "Nie udało się uruchomić tar",
         ErrorTarFailed = error => "tar zakończył się błędem: " + error,
         ErrorDenoUpdate = error => "Błąd aktualizacji Deno: " + error,
         ErrorUpdate = error => "Błąd aktualizacji: " + error,
@@ -339,7 +337,6 @@ internal sealed class Strings
         ErrorFFmpeg = error => "FFmpeg error: " + error,
         ErrorFFmpegLinkNotFound = "FFmpeg download link not found",
         ErrorFFmpegBinNotFound = "bin folder not found",
-        ErrorTarStart = "Could not start tar",
         ErrorTarFailed = error => "tar failed: " + error,
         ErrorDenoUpdate = error => "Deno update error: " + error,
         ErrorUpdate = error => "Update error: " + error,
