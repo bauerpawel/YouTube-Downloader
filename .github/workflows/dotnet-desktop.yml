@@ -6,6 +6,13 @@ permissions:
   actions: write
   contents: write
 
+# One run per ref at a time, never cancelled midway: two quick pushes to main
+# must publish their GitHub Release and Snap Store revision in push order -
+# otherwise the older build could finish last and become the snap's stable.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 on:
   push:
     branches: [ "main" ]
@@ -365,6 +372,11 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
 
+    # Read-only token: the smoke test hands it to the confined app and runs
+    # third-party binaries (yt-dlp, Deno, FFmpeg) next to the workspace.
+    permissions:
+      contents: read
+
     # Only whether the secret exists. The secret itself reaches the publish step
     # alone: the smoke test runs yt-dlp and Deno downloaded from the internet,
     # and they inherit the environment.
@@ -378,6 +390,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v7
+      with:
+        persist-credentials: false
 
     - name: Download the published single-file binary
       uses: actions/download-artifact@v8
@@ -437,9 +451,33 @@ jobs:
           fi
         done
         if [ "$ok" = 1 ]; then
-          echo "yt-dlp and ffmpeg were downloaded to $COMMON and are executable under strict confinement"
+          echo "yt-dlp and ffmpeg were downloaded to $COMMON and are executable"
+          # A real download runs these tools inside the app's confinement (yt-dlp
+          # is a PyInstaller onefile that unpacks into the snap's private /tmp),
+          # reads user-dirs.dirs through the desktop interface and writes the
+          # downloads folder through the home interface - do exactly that here,
+          # without the GitHub token (third-party binaries).
+          mkdir -p "$HOME/.config"
+          echo 'XDG_DOWNLOAD_DIR="$HOME/Pobrane"' > "$HOME/.config/user-dirs.dirs"
+          if env -u YTD_GITHUB_TOKEN snap run --shell yt-downloader-bp -c '
+            set -e
+            "$SNAP_USER_COMMON/yt-dlp" --version
+            "$SNAP_USER_COMMON/deno" --version
+            "$SNAP_USER_COMMON/ffmpeg_bin/ffmpeg" -version | head -1
+            "$SNAP_USER_COMMON/ffmpeg_bin/ffprobe" -version | head -1
+            grep XDG_DOWNLOAD_DIR "$SNAP_REAL_HOME/.config/user-dirs.dirs"
+            mkdir -p "$SNAP_REAL_HOME/Pobrane/YouTube Downloader"
+            touch "$SNAP_REAL_HOME/Pobrane/YouTube Downloader/write-test"
+          '; then
+            echo "The tools run and the downloads folder is readable and writable under strict confinement"
+          else
+            echo "Running the tools or using the downloads folder failed under strict confinement"
+            ok=0
+          fi
         else
           echo "Tools not in $COMMON after 120 s (or the app stopped)"
+        fi
+        if [ "$ok" != 1 ]; then
           ls -la "$COMMON" "$COMMON/ffmpeg_bin" 2>&1 || true
           cat "$LOG"
           echo "--- AppArmor / seccomp denials:"
