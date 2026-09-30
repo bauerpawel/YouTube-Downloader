@@ -31,6 +31,7 @@ internal static class AppPaths
         IsSnap,
         AppContext.BaseDirectory,
         Environment.GetEnvironmentVariable("SNAP_REAL_HOME"),
+        Environment.GetEnvironmentVariable("SNAP_USER_COMMON"),
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)));
 
     public static string AppDirectory { get; } = AppContext.BaseDirectory;
@@ -56,15 +57,20 @@ internal static class AppPaths
     // Inside a snap: the user's Downloads folder (the desktop interface may read
     // ~/.config/user-dirs.dirs, the home interface may write there) plus a
     // folder of our own. $HOME is ~/snap/<name>/<revision> there; snapd passes
-    // the real one in SNAP_REAL_HOME.
+    // the real one in SNAP_REAL_HOME. Without it (old snapd) $SNAP_USER_COMMON,
+    // never the versioned $HOME: snapd copies that on every refresh, videos
+    // included.
     public const string SnapDownloadsFolderName = "YouTube Downloader";
 
-    public static string ResolveDownloadsDirectory(bool isSnap, string appDirectory, string? snapRealHome, string userProfile)
+    public static string ResolveDownloadsDirectory(bool isSnap, string appDirectory, string? snapRealHome,
+        string? snapUserCommon, string userProfile)
     {
         if (!isSnap)
             return Path.Combine(appDirectory, "downloads");
 
-        string realHome = string.IsNullOrEmpty(snapRealHome) ? userProfile : snapRealHome;
+        string realHome = !string.IsNullOrEmpty(snapRealHome) ? snapRealHome
+            : !string.IsNullOrEmpty(snapUserCommon) ? snapUserCommon
+            : userProfile;
         string? userDirs = TryReadAllText(Path.Combine(realHome, ".config", "user-dirs.dirs"));
         return Path.Combine(ResolveUserDownloadDirectory(userDirs, realHome), SnapDownloadsFolderName);
     }
