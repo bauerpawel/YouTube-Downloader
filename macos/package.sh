@@ -39,7 +39,9 @@ cp "$HERE/Info.plist" "$APP/Contents/Info.plist"
     "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist"
 
-cp "$HERE/AppIcon.icns" "$APP/Contents/Resources/"
+# iconutil writes each size in the encoding macOS expects; a hand-packed .icns
+# with PNG data in the 16/32 px slots showed noise in Finder's title bar.
+iconutil -c icns -o "$APP/Contents/Resources/AppIcon.icns" "$HERE/AppIcon.iconset"
 cp -R "$HERE/en.lproj" "$HERE/pl.lproj" "$APP/Contents/Resources/"
 
 # Ad-hoc signature over the whole bundle: Apple Silicon runs no unsigned code,
@@ -66,7 +68,7 @@ rm -f "$OUT/YouTubeDownloader-$RID.dmg"
 "$VENV/bin/dmgbuild" \
     -s "$HERE/dmg-settings.py" \
     -D app="$APP" \
-    -D icon="$HERE/AppIcon.icns" \
+    -D icon="$APP/Contents/Resources/AppIcon.icns" \
     "$APP_NAME" "$OUT/YouTubeDownloader-$RID.dmg"
 rm -rf "$VENV"
 
