@@ -59,17 +59,20 @@ internal static class AppUpdater
             : OperatingSystem.IsMacOS() ? "osx"
             : OperatingSystem.IsLinux() ? "linux"
             : "";
-        return GetAssetName(os, RuntimeInformation.ProcessArchitecture);
+        return GetAssetName(os, RuntimeInformation.ProcessArchitecture, AppPaths.AppBundlePath != null);
     }
 
-    public static string GetAssetName(string os, Architecture architecture)
+    // macOS has two installs: the plain folder (.zip, what every version before the
+    // .dmg installed and still updates from) and the .app bundle (.dmg), which
+    // updates from a zip of the whole bundle.
+    public static string GetAssetName(string os, Architecture architecture, bool appBundle = false)
     {
         string arch = architecture == Architecture.Arm64 ? "arm64" : "x64";
         return os switch
         {
             "win" => $"YouTubeDownloader-win-{arch}.exe",
             "linux" => $"YouTubeDownloader-linux-{arch}",
-            "osx" => $"YouTubeDownloader-osx-{arch}.zip",
+            "osx" => appBundle ? $"YouTubeDownloader-osx-{arch}-app.zip" : $"YouTubeDownloader-osx-{arch}.zip",
             _ => throw new PlatformNotSupportedException("App self-update is only supported on Windows, Linux, and macOS.")
         };
     }
@@ -148,8 +151,9 @@ internal static class AppUpdater
             .Select(file => (Source: file, Target: Path.Combine(appDirectory, Path.GetRelativePath(extractedDirectory, file))))
             .ToList();
 
-    // macOS only (single-file Windows/Linux use StartSwapAfterExit). Two phases so
-    // a failure anywhere leaves the installed app intact:
+    // macOS plain folder only (single-file Windows/Linux use StartSwapAfterExit, the
+    // .app bundle StartBundleSwapAfterExit). Two phases so a failure anywhere
+    // leaves the installed app intact:
     // 1) every existing target -> target.old, 2) every source -> target.
     public static void ApplyUpdate(IReadOnlyList<(string Source, string Target)> files)
     {
@@ -266,6 +270,73 @@ internal static class AppUpdater
                 ["YTD_UPDATE_TARGET"] = executablePath
             }
         };
+
+    // macOS .app bundle: the zip holds exactly one <name>.app.
+    public static string FindExtractedBundle(string extractedDirectory)
+    {
+        string[] bundles = Directory.GetDirectories(extractedDirectory, "*.app");
+        if (bundles.Length != 1 || !File.Exists(Path.Combine(bundles[0], "Contents", "Info.plist")))
+            throw new InvalidDataException("The update does not contain exactly one .app bundle.");
+
+        // A zip may or may not carry Unix modes; the bit is harmless on libraries.
+        foreach (string file in Directory.GetFiles(Path.Combine(bundles[0], "Contents", "MacOS")))
+            AppPaths.MakeExecutable(file);
+
+        return bundles[0];
+    }
+
+    // macOS .app bundle: replaced as a whole once this process has exited, so the
+    // running app never loads an assembly from the new version and the bundle's
+    // code signature stays intact. The old bundle is renamed to <bundle>.old first
+    // and put back if the new one cannot be moved in; either way the bundle at the
+    // original path is opened again. Positional parameters ($1..$3), as in
+    // UnixSwapScript. CI runs this exact text against real bundles - keep it a raw
+    // literal between the BEGIN/END lines.
+    // BEGIN MacBundleSwapScript
+    private const string MacBundleSwapScript = """
+        while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
+        rm -rf "$3.old"
+        if mv "$3" "$3.old"; then
+          if mv "$2" "$3"; then rm -rf "$3.old"; else mv "$3.old" "$3"; fi
+        fi
+        exec /usr/bin/open "$3"
+        """;
+    // END MacBundleSwapScript
+
+    public static void StartBundleSwapAfterExit(string newBundlePath, string bundlePath)
+    {
+        var startInfo = new ProcessStartInfo("/bin/sh")
+        {
+            // A raw literal takes the source file's line endings - CRLF in a Windows
+            // checkout (build.bat cross-compiles osx too), and sh rejects "done\r".
+            ArgumentList =
+            {
+                "-c", MacBundleSwapScript.ReplaceLineEndings("\n"), "sh",
+                Environment.ProcessId.ToString(CultureInfo.InvariantCulture),
+                newBundlePath, bundlePath
+            },
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            WorkingDirectory = Path.GetDirectoryName(bundlePath) ?? "/"
+        };
+
+        using var process = Process.Start(startInfo);
+    }
+
+    // macOS .app bundle: the download and its extraction live in the data folder -
+    // nothing may be written into the bundle itself.
+    public static void DeleteBundleUpdateDownloads(string dataDirectory)
+    {
+        AppPaths.TryDeleteFile(Path.Combine(dataDirectory, UpdateZipName));
+        AppPaths.TryDeleteDirectory(Path.Combine(dataDirectory, UpdateDirectoryName));
+    }
+
+    // This process runs from bundlePath, so <bundle>.old is never the only copy.
+    public static void CleanupBundleLeftovers(string bundlePath, string dataDirectory)
+    {
+        AppPaths.TryDeleteDirectory(bundlePath + OldSuffix);
+        DeleteBundleUpdateDownloads(dataDirectory);
+    }
 
     public static void Relaunch(string executablePath)
     {

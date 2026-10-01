@@ -56,6 +56,8 @@ public partial class MainWindow : Window
         // Remove what a previous self-update left behind (<exe>.old on Windows is
         // only deletable once the old process has exited).
         AppUpdater.CleanupLeftovers(appDirectory, Environment.ProcessPath);
+        if (AppPaths.AppBundlePath is { } appBundlePath)
+            AppUpdater.CleanupBundleLeftovers(appBundlePath, dataDirectory);
 
         InitializeComponent();
 
@@ -1094,10 +1096,16 @@ public partial class MainWindow : Window
         if (!confirmed)
             return;
 
-        if (!AppUpdater.CanWriteDirectory(appDirectory))
+        // A macOS .app bundle is replaced as a whole, which takes write access to
+        // the folder holding it (/Applications) - not there when it runs straight
+        // from the mounted .dmg or translocated by Gatekeeper.
+        string installDirectory = AppPaths.AppBundlePath is { } bundlePath
+            ? Path.GetDirectoryName(bundlePath) ?? appDirectory
+            : appDirectory;
+        if (!AppUpdater.CanWriteDirectory(installDirectory))
         {
             bool openPage = await MessageDialog.ShowConfirmAsync(this,
-                Ui.AppUpdateNoWriteAccess(appDirectory),
+                Ui.AppUpdateNoWriteAccess(installDirectory),
                 title);
             if (openPage)
                 await OpenUrl(release.HtmlUrl);
@@ -1116,14 +1124,15 @@ public partial class MainWindow : Window
             return;
         }
 
-        string downloadPath = OperatingSystem.IsMacOS()
-            ? Path.Combine(appDirectory, AppUpdater.UpdateZipName)
+        string? bundlePath = AppPaths.AppBundlePath;
+        string downloadPath = bundlePath != null ? Path.Combine(dataDirectory, AppUpdater.UpdateZipName)
+            : OperatingSystem.IsMacOS() ? Path.Combine(appDirectory, AppUpdater.UpdateZipName)
             : exePath + AppUpdater.NewSuffix;
 
-        // Windows/Linux (single-file): this process must not replace its own file -
-        // a helper does that (and the restart) once we have exited, see
-        // AppUpdater.StartSwapAfterExit.
-        bool swapAfterExit = !OperatingSystem.IsMacOS();
+        // Windows/Linux (single-file) and the macOS .app bundle: this process must
+        // not replace its own files - a helper does that (and the restart) once we
+        // have exited, see AppUpdater.StartSwapAfterExit/StartBundleSwapAfterExit.
+        bool swapAfterExit = !OperatingSystem.IsMacOS() || bundlePath != null;
 
         SetBusy(true);
         try
@@ -1134,7 +1143,17 @@ public partial class MainWindow : Window
             if (!AppUpdater.VerifyDownload(downloadPath, asset))
                 throw new InvalidDataException(Ui.ErrorDownloadCorrupt);
 
-            if (swapAfterExit)
+            if (bundlePath != null)
+            {
+                UpdateStatus(Ui.StatusInstallingAppUpdate);
+                string extractDirectory = Path.Combine(dataDirectory, AppUpdater.UpdateDirectoryName);
+                AppPaths.TryDeleteDirectory(extractDirectory);
+                ZipFile.ExtractToDirectory(downloadPath, extractDirectory);
+                AppPaths.TryDeleteFile(downloadPath);
+
+                AppUpdater.StartBundleSwapAfterExit(AppUpdater.FindExtractedBundle(extractDirectory), bundlePath);
+            }
+            else if (swapAfterExit)
             {
                 AppUpdater.StartSwapAfterExit(downloadPath, exePath);
             }
@@ -1152,6 +1171,8 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             AppUpdater.DeleteUpdateDownloads(appDirectory, exePath);
+            if (bundlePath != null)
+                AppUpdater.DeleteBundleUpdateDownloads(dataDirectory);
             SetBusy(false);
             UpdateStatus(Ui.StatusAppUpdateError(ex.Message));
             await MessageDialog.ShowAsync(this, Ui.ErrorAppUpdateFailed(ex.Message), Ui.TitleError);
@@ -1160,7 +1181,7 @@ public partial class MainWindow : Window
 
         UpdateStatus(Ui.StatusAppUpdatedRestarting);
 
-        // The helper still needs <exe>.new.
+        // The helper still needs <exe>.new (or the extracted bundle).
         if (!swapAfterExit)
         {
             AppUpdater.DeleteUpdateDownloads(appDirectory, exePath);

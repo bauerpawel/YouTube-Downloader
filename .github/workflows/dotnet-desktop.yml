@@ -274,6 +274,25 @@ jobs:
         kill $APP_PID 2>/dev/null || true
         rm -rf "$SMOKE"
 
+    # macOS installer: "YouTube Downloader.app" in a .dmg (drag to Applications),
+    # plus a zip of the same bundle that the .app's self-update downloads. The
+    # plain publish-folder zip below stays: every version before the .dmg was
+    # installed from it and updates from it. Built into ./dist, so that zip
+    # does not pick it up.
+    - name: Build app bundle and .dmg (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      run: bash macos/package.sh ./publish/${{ matrix.rid }} ./dist/${{ matrix.rid }} ${{ matrix.rid }} ${{ steps.get_version.outputs.version }} ${{ github.run_number }}
+
+    # Installs the app from the .dmg like a user, starts it through Launch
+    # Services and runs the self-update swap script - see macos/smoke-test.sh.
+    - name: Smoke-test .dmg (macOS)
+      if: runner.os == 'macOS'
+      shell: bash
+      env:
+        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: bash macos/smoke-test.sh ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.dmg ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}-app.zip
+
     # Package publish folder - create zip of the publish folder
     - name: Package publish folder
       run: Compress-Archive -Path ./publish/${{ matrix.rid }}/* -DestinationPath ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip -Force
@@ -334,9 +353,10 @@ jobs:
           ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
           ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
 
-    # macOS isn't single-file (see "Publish Application"), so only the zip -
-    # the whole publish folder, with its native libraries alongside the exe -
-    # is a valid, runnable release asset; there is no standalone exe to attach.
+    # macOS isn't single-file (see "Publish Application"), so there is no
+    # standalone exe to attach: the .dmg (installer), the -app.zip (the .app's
+    # self-update) and the plain publish-folder zip (self-update of installs
+    # from before the .dmg).
     - name: Create Release (macOS)
       if: runner.os == 'macOS'
       uses: softprops/action-gh-release@v3
@@ -349,6 +369,8 @@ jobs:
         draft: false
         prerelease: false
         files: |
+          ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.dmg
+          ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}-app.zip
           ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
 
   # Snap Store package yt-downloader-bp (docs/superpowers/specs/2026-09-30-snap-store-design.md).
