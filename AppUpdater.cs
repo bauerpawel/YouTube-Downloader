@@ -271,18 +271,24 @@ internal static class AppUpdater
             }
         };
 
-    // macOS .app bundle: the zip holds exactly one <name>.app.
-    public static string FindExtractedBundle(string extractedDirectory)
+    // macOS .app bundle: codesign keeps the signatures of the non-Mach-O files in
+    // Contents/MacOS (.dll, .json) in extended attributes. ditto carries them (and
+    // the Unix modes) through the zip - macos/package.sh zips with ditto too -
+    // while .NET's ZipFile drops them and leaves a bundle that fails verification.
+    public static Task<(int ExitCode, string StandardError)> ExtractBundleZipAsync(string zipPath, string destination) =>
+        ProcessRunner.RunAsync(new ProcessStartInfo("/usr/bin/ditto")
+        {
+            ArgumentList = { "-x", "-k", zipPath, destination },
+            CreateNoWindow = true
+        });
+
+    // macOS .app bundle: the zip holds exactly one <name>.app; null otherwise.
+    public static string? FindExtractedBundle(string extractedDirectory)
     {
         string[] bundles = Directory.GetDirectories(extractedDirectory, "*.app");
-        if (bundles.Length != 1 || !File.Exists(Path.Combine(bundles[0], "Contents", "Info.plist")))
-            throw new InvalidDataException("The update does not contain exactly one .app bundle.");
-
-        // A zip may or may not carry Unix modes; the bit is harmless on libraries.
-        foreach (string file in Directory.GetFiles(Path.Combine(bundles[0], "Contents", "MacOS")))
-            AppPaths.MakeExecutable(file);
-
-        return bundles[0];
+        return bundles.Length == 1 && File.Exists(Path.Combine(bundles[0], "Contents", "Info.plist"))
+            ? bundles[0]
+            : null;
     }
 
     // macOS .app bundle: replaced as a whole once this process has exited, so the

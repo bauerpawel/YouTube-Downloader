@@ -5,7 +5,8 @@
 #     signature, Info.plist and icon
 #  3. it starts through Launch Services (as a double-click does) and downloads
 #     its tools into the data folder, writing nothing into the bundle
-#  4. the update zip holds a bundle whose signature survives a plain unzip
+#  4. the update zip, extracted with ditto as AppUpdater does, holds a bundle
+#     whose signature still verifies
 #  5. AppUpdater.cs's MacBundleSwapScript, run verbatim, swaps the bundle and
 #     opens it - and puts the old one back when the new one cannot be moved in
 # macOS only. Run by CI after macos/package.sh; set YTD_GITHUB_TOKEN to avoid the
@@ -71,6 +72,8 @@ mkdir -p "$T/Applications"
 ditto "$MNT/$APP_NAME.app" "$APP"
 hdiutil detach "$MNT"
 codesign --verify --deep --strict --verbose=2 "$APP" || fail "invalid signature after install"
+# The signatures of non-Mach-O files live in extended attributes - see package.sh.
+echo "extended attributes of a .dll: $(xattr "$APP/Contents/MacOS/YouTubeDownloader.dll" | tr '\n' ' ')"
 plutil -lint "$APP/Contents/Info.plist" || fail "invalid Info.plist"
 /usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" -c "Print :CFBundleVersion" "$APP/Contents/Info.plist"
 iconutil -c iconset -o "$T/AppIcon.iconset" "$APP/Contents/Resources/AppIcon.icns" || fail "macOS cannot read AppIcon.icns"
@@ -99,11 +102,11 @@ cat "$T/app.log"
 
 echo "== 4. update zip"
 mkdir -p "$T/update"
-unzip -q "$APP_ZIP" -d "$T/update"
+ditto -x -k "$APP_ZIP" "$T/update"
 [ "$(ls "$T/update")" = "$APP_NAME.app" ] || fail "the update zip must hold exactly $APP_NAME.app"
-[ -z "$(find "$T/update" -name '._*')" ] || fail "AppleDouble (._) files in the update zip"
+[ -z "$(find "$T/update" -name '._*')" ] || fail "AppleDouble (._) files left in the extracted update"
 NEW="$T/update/$APP_NAME.app"
-codesign --verify --deep --strict --verbose=2 "$NEW" || fail "update bundle signature invalid without extended attributes"
+codesign --verify --deep --strict --verbose=2 "$NEW" || fail "update bundle signature invalid after ditto -x -k"
 
 echo "== 5. MacBundleSwapScript from AppUpdater.cs"
 SCRIPT=$(tr -d '\r' < "$REPO/AppUpdater.cs" \

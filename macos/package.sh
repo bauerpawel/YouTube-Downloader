@@ -43,18 +43,18 @@ cp "$HERE/AppIcon.icns" "$APP/Contents/Resources/"
 cp -R "$HERE/en.lproj" "$HERE/pl.lproj" "$APP/Contents/Resources/"
 
 # Ad-hoc signature over the whole bundle: Apple Silicon runs no unsigned code,
-# and the bundle seal covers Info.plist and the resources. Non-Mach-O files in
-# Contents/MacOS (.dll, .json) are sealed by hash in CodeResources, so the
-# signature needs no extended attributes and survives a plain zip. An invalid
-# signature on a quarantined app makes macOS call it "damaged" with no way to
-# open it - hence the strict verify.
+# and the bundle seal covers Info.plist and the resources. codesign treats every
+# file in Contents/MacOS as code and keeps the signatures of the non-Mach-O ones
+# (.dll, .json) in extended attributes - the .dmg keeps them, a plain zip does
+# not. An invalid signature on a quarantined app makes macOS call it "damaged"
+# with no way to open it - hence the strict verify.
 codesign --force --deep --sign - "$APP"
 codesign --verify --deep --strict --verbose=2 "$APP"
 
-# Update zip: no resource forks or extended attributes - .NET's ZipFile would
-# extract AppleDouble entries as stray ._ files into the bundle.
+# Update zip, made and (by AppUpdater.ExtractBundleZipAsync) extracted with
+# ditto, which carries the extended attributes along.
 rm -f "$OUT/YouTubeDownloader-$RID-app.zip"
-(cd "$OUT" && ditto -c -k --keepParent --norsrc --noextattr --noqtn "$APP_NAME.app" "YouTubeDownloader-$RID-app.zip")
+(cd "$OUT" && ditto -c -k --keepParent "$APP_NAME.app" "YouTubeDownloader-$RID-app.zip")
 
 # dmgbuild writes the window layout (.DS_Store) itself - no Finder/AppleScript,
 # which a headless CI runner does not reliably have.

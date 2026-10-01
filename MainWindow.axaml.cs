@@ -1148,10 +1148,14 @@ public partial class MainWindow : Window
                 UpdateStatus(Ui.StatusInstallingAppUpdate);
                 string extractDirectory = Path.Combine(dataDirectory, AppUpdater.UpdateDirectoryName);
                 AppPaths.TryDeleteDirectory(extractDirectory);
-                ZipFile.ExtractToDirectory(downloadPath, extractDirectory);
+                var (exitCode, error) = await AppUpdater.ExtractBundleZipAsync(downloadPath, extractDirectory);
+                if (exitCode != 0)
+                    throw new IOException(Ui.ErrorDittoFailed(error.Trim()));
                 AppPaths.TryDeleteFile(downloadPath);
 
-                AppUpdater.StartBundleSwapAfterExit(AppUpdater.FindExtractedBundle(extractDirectory), bundlePath);
+                string newBundle = AppUpdater.FindExtractedBundle(extractDirectory)
+                    ?? throw new InvalidDataException(Ui.ErrorDownloadCorrupt);
+                AppUpdater.StartBundleSwapAfterExit(newBundle, bundlePath);
             }
             else if (swapAfterExit)
             {
