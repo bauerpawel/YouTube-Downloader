@@ -35,6 +35,7 @@ YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64)
 - 🐛 **Naprawione użycie Deno na Linuksie i macOS** - yt-dlp dostaje teraz ścieżkę do Deno pobranego przez aplikację. Wcześniej go nie znajdował i pobierał z YouTube bez silnika JavaScript, przez co część filmów lub formatów mogła być niedostępna
 - 🐛 **Pobieranie nie zawiesza się** - gdy yt-dlp lub tar wypisywały dużo komunikatów, narzędzie zatrzymywało się w połowie pobierania albo rozpakowywania, a aplikacja czekała na nie w nieskończoność
 - 🐛 **Linux: uruchomienie z terminala innego snapa** (np. VS Code) nie jest już mylone z wersją snap - wcześniej wyłączało to automatyczną aktualizację i zapisywało narzędzia w folderze tamtego snapa
+- 🎨 **Nowa ikona** - kwadratowa ikona (strzałka pobierania na czerwonym kafelku) w oknie, na pasku zadań i w snapie. Snap pokazywał wcześniej szerokie logo z napisem, które w menu aplikacji było nieczytelnym paskiem
 
 ### 🆕 Co nowego w wersji 2.0.280926
 
@@ -215,10 +216,11 @@ YouTube-Downloader/
 ├── YtDlpArguments.cs            # Argumenty yt-dlp dla jakości/formatu
 ├── ProcessRunner.cs             # Uruchamianie narzędzi (yt-dlp, tar) bez blokowania na wyjściu
 ├── Assets/
-│   └── app-logo.png             # Logo aplikacji, widoczne w oknie Informacje i oknach komunikatów
+│   └── app-logo.png             # Ikona aplikacji 64 px, widoczna w oknie Informacje i oknach komunikatów
 ├── YouTubeDownloader.csproj     # Konfiguracja projektu .NET 10 (pakiety Avalonia)
 ├── app.ico                      # Ikona aplikacji/okna
-├── logo.svg                     # Źródłowe logo aplikacji (SVG)
+├── icon.svg                     # Ikona aplikacji (SVG) - ikona snapa, źródło app.ico i app-logo.png
+├── logo.svg                     # Logo z nazwą (SVG), na górze tego pliku
 ├── build.bat                    # Owija `dotnet publish` dla win-x64/win-arm64
 ├── build.sh                     # Owija `dotnet publish` dla linux-x64/linux-arm64/osx-x64/osx-arm64
 ├── snap/                        # Pakiet Snap Store (snapcraft.yaml, skrót w menu)
@@ -265,6 +267,7 @@ YouTube Downloader is a Windows, Linux, and macOS desktop application built with
 - 🐛 **Fixed Deno on Linux and macOS** - yt-dlp now gets the path of the Deno the app downloads. Before, it could not find it and downloaded from YouTube without a JavaScript runtime, so some videos or formats could be unavailable
 - 🐛 **Downloads no longer hang** - when yt-dlp or tar printed a lot of messages, the app could wait forever for a download or an extraction
 - 🐛 **Linux: started from another snap's terminal** (e.g. VS Code) is no longer mistaken for the snap version - that used to turn off automatic updates and store the tools in that other snap's folder
+- 🎨 **New icon** - a square icon (download arrow on a red tile) for the window, the taskbar and the snap. The snap used to show the wide logo with text, which became an unreadable strip in the app menu
 
 ### 🆕 What's New in 2.0.280926
 
@@ -445,10 +448,11 @@ YouTube-Downloader/
 ├── YtDlpArguments.cs            # yt-dlp arguments for quality/format
 ├── ProcessRunner.cs             # Runs tools (yt-dlp, tar) without blocking on their output
 ├── Assets/
-│   └── app-logo.png             # Application logo, shown in About and message dialogs
+│   └── app-logo.png             # 64 px application icon, shown in About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
 ├── app.ico                      # Application/window icon
-├── logo.svg                     # Source application logo (SVG)
+├── icon.svg                     # Application icon (SVG) - the snap icon, source of app.ico and app-logo.png
+├── logo.svg                     # Logo with the app name (SVG), at the top of this file
 ├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64
 ├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64/osx-x64/osx-arm64
 ├── snap/                        # Snap Store package (snapcraft.yaml, menu entry)

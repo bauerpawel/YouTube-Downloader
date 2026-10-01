@@ -36,10 +36,13 @@ YouTube-Downloader/
 ├── YtDlpArguments.cs            # yt-dlp format args from quality values (not display text)
 ├── ProcessRunner.cs             # Runs a tool with stdout/stderr drained while it runs (no Avalonia)
 ├── Assets/
-│   └── app-logo.png             # Application logo, shown in About and message dialogs
+│   └── app-logo.png             # Application icon, 64 px (rendered from icon.svg), shown in
+│                                 # About and message dialogs
 ├── YouTubeDownloader.csproj     # .NET 10 project configuration (Avalonia packages)
-├── app.ico                      # Application/window icon
-├── logo.svg                     # Source application logo (SVG)
+├── app.ico                      # Application/window icon, 256/64/48/32/16 px (rendered from icon.svg)
+├── icon.svg                     # Square application icon: the snap icon and the source of
+│                                 # app.ico and Assets/app-logo.png
+├── logo.svg                     # Wide logo banner with text, shown at the top of README.md (not an icon)
 ├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64 (Windows)
 ├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64/osx-x64/osx-arm64
 ├── snap/
@@ -605,6 +608,6 @@ This project follows standard Git practices:
 
 ---
 
-**Last Updated**: 2026-09-30
+**Last Updated**: 2026-10-01
 **For**: AI Assistants (Claude, etc.)
 **Project**: YouTube Downloader for Windows, Linux, and macOS (.NET 10)

@@ -13,7 +13,9 @@ description: |
   swoje narzędzia (yt-dlp, FFmpeg, Deno). Interfejs po polsku i angielsku.
   Pliki trafiają do folderu Pobrane, do „YouTube Downloader”.
 license: Apache-2.0
-icon: logo.svg
+# Square icon, copied to meta/gui/icon.svg (the .desktop file points there).
+# Not logo.svg: that wide banner shrinks to an unreadable strip in launchers.
+icon: icon.svg
 website: https://github.com/bauerpawel/YouTube-Downloader
 source-code: https://github.com/bauerpawel/YouTube-Downloader
 issues: https://github.com/bauerpawel/YouTube-Downloader/issues

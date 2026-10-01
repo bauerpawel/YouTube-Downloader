@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- Application icon: the snap icon and the source of app.ico and Assets/app-logo.png.
+       Square, no text, no filters - it has to stay legible down to 16 px in every renderer. -->
+  <defs>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FF5A4E"/>
+      <stop offset="1" stop-color="#E3241B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Tile: darker bottom edge, then the face -->
+  <rect x="20" y="28" width="216" height="208" rx="52" fill="#A8170F"/>
+  <rect x="20" y="20" width="216" height="208" rx="52" fill="url(#face)"/>
+
+  <!-- Download arrow -->
+  <g fill="#fff" stroke="#fff" stroke-linejoin="round">
+    <rect x="111" y="50" width="34" height="66" rx="9" stroke="none"/>
+    <path d="M72 108 H184 L128 162 Z" stroke-width="14"/>
+  </g>
+
+  <!-- Tray -->
+  <path d="M60 148 V176 Q60 192 76 192 H180 Q196 192 196 176 V148"
+        fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
