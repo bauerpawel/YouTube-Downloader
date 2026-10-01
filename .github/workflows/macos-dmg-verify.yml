@@ -55,6 +55,24 @@ jobs:
         YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: bash macos/smoke-test.sh ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.dmg ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}-app.zip
 
+    # What a user sees after opening the .dmg (Finder lays it out from .DS_Store).
+    - name: Screenshot of the .dmg window
+      if: matrix.rid == 'osx-arm64'
+      run: |
+        hdiutil attach -noautoopen ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.dmg
+        open "/Volumes/YouTube Downloader"
+        sleep 8
+        screencapture -x dmg-window.png
+        hdiutil detach "/Volumes/YouTube Downloader" -force || true
+
+    - name: Upload screenshot
+      if: matrix.rid == 'osx-arm64'
+      uses: actions/upload-artifact@v7
+      with:
+        name: dmg-window-screenshot
+        path: dmg-window.png
+        if-no-files-found: warn
+
     # To try the installer on a real Mac.
     - name: Upload .dmg
       if: always()
