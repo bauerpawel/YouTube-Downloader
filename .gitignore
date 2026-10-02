@@ -18,3 +18,6 @@ downloads/
 *.suo
 snap-bin/
 *.snap
+
+# Superpowers specs/plans - local only, never pushed
+docs/superpowers/
