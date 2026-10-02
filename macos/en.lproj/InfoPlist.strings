@@ -1,0 +1,2 @@
+/* Shown by macOS when the app first writes to ~/Downloads. */
+"NSDownloadsFolderUsageDescription" = "YouTube Downloader saves downloaded videos and audio to the YouTube Downloader folder in your Downloads folder.";

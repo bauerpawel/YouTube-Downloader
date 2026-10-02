@@ -36,6 +36,7 @@ YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64)
 - 🐛 **Pobieranie nie zawiesza się** - gdy yt-dlp lub tar wypisywały dużo komunikatów, narzędzie zatrzymywało się w połowie pobierania albo rozpakowywania, a aplikacja czekała na nie w nieskończoność
 - 🐛 **Linux: uruchomienie z terminala innego snapa** (np. VS Code) nie jest już mylone z wersją snap - wcześniej wyłączało to automatyczną aktualizację i zapisywało narzędzia w folderze tamtego snapa
 - 🎨 **Nowa ikona** - kwadratowa ikona (strzałka pobierania na czerwonym kafelku) w oknie, na pasku zadań i w snapie. Snap pokazywał wcześniej szerokie logo z napisem, które w menu aplikacji było nieczytelnym paskiem
+- 🍎 **Instalator dla macOS** - plik `.dmg`: po otwarciu wystarczy przeciągnąć aplikację do folderu Aplikacje. Aplikacja ma swoją ikonę w Docku i Launchpadzie, pobrane pliki trafiają do Pobrane → „YouTube Downloader”, a automatyczna aktualizacja podmienia całą aplikację. Dotychczasowa paczka `.zip` jest nadal publikowana i aktualizuje się jak wcześniej
 
 ### 🆕 Co nowego w wersji 2.0.280926
 
@@ -171,6 +172,14 @@ sudo snap install yt-downloader-bp
 
 Wersję snap aktualizuje Snap Store (automatyczna aktualizacja w samej aplikacji jest w niej wyłączona). Pobrane pliki trafiają do systemowego folderu pobranych, do podfolderu `YouTube Downloader` (np. `~/Pobrane/YouTube Downloader`). Jeśli folder pobranych leży na innym dysku (`/media`, `/mnt` - także przez dowiązanie z `~/Pobrane`), zezwól na to raz: `sudo snap connect yt-downloader-bp:removable-media`.
 
+### 🍎 Instalacja na macOS
+
+1. Pobierz z [najnowszego wydania](https://github.com/bauerpawel/YouTube-Downloader/releases/latest) plik `YouTubeDownloader-osx-arm64.dmg` (Apple Silicon: M1 i nowsze) albo `YouTubeDownloader-osx-x64.dmg` (Intel)
+2. Otwórz plik `.dmg` i przeciągnij **YouTube Downloader** do folderu **Aplikacje**
+3. Przy pierwszym uruchomieniu zezwól na otwarcie aplikacji - patrz sekcja "Gatekeeper (macOS)" poniżej
+
+Pobrane pliki trafiają do `~/Downloads/YouTube Downloader` (w Finderze: Pobrane). Przy pierwszym pobieraniu macOS zapyta o dostęp do folderu Pobrane - trzeba zezwolić (po aktualizacji aplikacji pytanie może się powtórzyć, bo aplikacja nie jest podpisana certyfikatem Apple). Aplikacja aktualizuje się sama, gdy leży w folderze, do którego masz prawo zapisu (np. Aplikacje).
+
 ### 🚀 Użytkowanie
 
 1. **Uruchom aplikację** - Otwórz pobrany plik (np. `YouTubeDownloader-win-x64.exe`). Przy pierwszym uruchomieniu aplikacja sama pobierze yt-dlp, FFmpeg i Deno
@@ -179,7 +188,7 @@ Wersję snap aktualizuje Snap Store (automatyczna aktualizacja w samej aplikacji
 4. **Wybierz jakość** - Od "Najlepsza" do 240p (w trybie audio pole jest nieaktywne)
 5. **Wybierz format** - mp4 (zalecany), webm lub mkv
 6. **Kliknij "Pobierz"** - Aplikacja rozpocznie pobieranie i pokaże postęp
-7. **Pliki w folderze downloads** - Pobrane pliki znajdziesz w folderze `downloads` w katalogu aplikacji (w wersji snap: `YouTube Downloader` w folderze Pobrane)
+7. **Pliki w folderze downloads** - Pobrane pliki znajdziesz w folderze `downloads` w katalogu aplikacji (w wersji snap i w aplikacji z `.dmg` na macOS: `YouTube Downloader` w folderze Pobrane)
 
 Język interfejsu zmienisz w menu **Widok → Język** (Polski / English). Przy pierwszym uruchomieniu dobierany jest do języka systemu.
 
@@ -188,9 +197,9 @@ Język interfejsu zmienisz w menu **Widok → Język** (Polski / English). Przy 
 Aplikacja nie jest podpisana ani notaryzowana (wymagałoby to płatnego konta Apple Developer Program, którego projekt obecnie nie posiada). Przy pierwszym uruchomieniu macOS Gatekeeper wyświetli ostrzeżenie, że aplikacja pochodzi od "niezidentyfikowanego dewelopera" lub "nie może zostać zweryfikowana". Aby ją uruchomić, wystarczy raz wykonać jedną z poniższych czynności:
 
 1. **Zalecane (działa na macOS 15 Sequoia i nowszych, a także na starszych wersjach)**: spróbuj otworzyć aplikację - zostanie zablokowana - a następnie przejdź do **Ustawienia systemowe -> Prywatność i bezpieczeństwo**, przewiń w dół do komunikatu o zablokowanej aplikacji i kliknij **"Otwórz mimo to"**. (Starszy sposób przez kliknięcie prawym przyciskiem/Control+klik -> "Otwórz" od macOS 15 Sequoia nie pokazuje już opcji "Otwórz mimo to".)
-2. **Alternatywa w terminalu**: usuń atrybut kwarantanny bezpośrednio: `xattr -d com.apple.quarantine <ścieżka-do-pliku>`
+2. **Alternatywa w terminalu**: usuń atrybut kwarantanny bezpośrednio: `xattr -dr com.apple.quarantine "/Applications/YouTube Downloader.app"` (dla paczki `.zip`: `xattr -d com.apple.quarantine <ścieżka-do-pliku>`)
 
-Ten krok nie musi być powtarzany przy kolejnych uruchomieniach tego samego pliku. Uwaga: paczka `.zip` z wydania (budowana w CI za pomocą `Compress-Archive`) nie zachowuje uniksowego bitu wykonywalności - po rozpakowaniu na macOS lub Linuksie należy najpierw nadać uprawnienie: `chmod +x <ścieżka-do-pliku>`, zanim aplikację da się w ogóle uruchomić (niezależnie od kroku z Gatekeeperem powyżej).
+Ten krok nie musi być powtarzany przy kolejnych uruchomieniach tego samego pliku. Uwaga (tylko paczka `.zip`, nie `.dmg`): paczka `.zip` z wydania (budowana w CI za pomocą `Compress-Archive`) nie zachowuje uniksowego bitu wykonywalności - po rozpakowaniu na macOS lub Linuksie należy najpierw nadać uprawnienie: `chmod +x <ścieżka-do-pliku>`, zanim aplikację da się w ogóle uruchomić (niezależnie od kroku z Gatekeeperem powyżej).
 
 ### 📂 Struktura projektu
 
@@ -223,6 +232,7 @@ YouTube-Downloader/
 ├── logo.svg                     # Logo z nazwą (SVG), na górze tego pliku
 ├── build.bat                    # Owija `dotnet publish` dla win-x64/win-arm64
 ├── build.sh                     # Owija `dotnet publish` dla linux-x64/linux-arm64/osx-x64/osx-arm64
+├── macos/                       # Instalator macOS: paczka .app, ikona, .dmg (package.sh) i jego test (smoke-test.sh)
 ├── snap/                        # Pakiet Snap Store (snapcraft.yaml, skrót w menu)
 ├── README.md                    # Dokumentacja projektu
 ├── LICENSE                      # Licencja Apache 2.0
@@ -268,6 +278,7 @@ YouTube Downloader is a Windows, Linux, and macOS desktop application built with
 - 🐛 **Downloads no longer hang** - when yt-dlp or tar printed a lot of messages, the app could wait forever for a download or an extraction
 - 🐛 **Linux: started from another snap's terminal** (e.g. VS Code) is no longer mistaken for the snap version - that used to turn off automatic updates and store the tools in that other snap's folder
 - 🎨 **New icon** - a square icon (download arrow on a red tile) for the window, the taskbar and the snap. The snap used to show the wide logo with text, which became an unreadable strip in the app menu
+- 🍎 **macOS installer** - a `.dmg`: open it and drag the app to the Applications folder. The app has its own icon in the Dock and Launchpad, downloads go to Downloads → "YouTube Downloader", and the automatic update replaces the whole app. The previous `.zip` is still published and updates as before
 
 ### 🆕 What's New in 2.0.280926
 
@@ -403,6 +414,14 @@ sudo snap install yt-downloader-bp
 
 The snap is updated by the Snap Store (the in-app self-update is off there). Downloads go to your system Downloads folder, into a `YouTube Downloader` subfolder (e.g. `~/Downloads/YouTube Downloader`). If your Downloads folder is on another drive (`/media`, `/mnt` - also via a symlink from `~/Downloads`), allow it once: `sudo snap connect yt-downloader-bp:removable-media`.
 
+### 🍎 Install on macOS
+
+1. Download `YouTubeDownloader-osx-arm64.dmg` (Apple Silicon: M1 and later) or `YouTubeDownloader-osx-x64.dmg` (Intel) from the [latest release](https://github.com/bauerpawel/YouTube-Downloader/releases/latest)
+2. Open the `.dmg` and drag **YouTube Downloader** to the **Applications** folder
+3. On first launch, allow the app to open - see "Gatekeeper (macOS)" below
+
+Downloads go to `~/Downloads/YouTube Downloader`. On the first download macOS asks for access to the Downloads folder - allow it (it may ask again after an app update, since the app is not signed with an Apple certificate). The app updates itself when it sits in a folder you can write to (such as Applications).
+
 ### 🚀 Usage
 
 1. **Launch the application** - Open the downloaded file (e.g. `YouTubeDownloader-win-x64.exe`). On first launch the app downloads yt-dlp, FFmpeg and Deno by itself
@@ -411,7 +430,7 @@ The snap is updated by the Snap Store (the in-app self-update is off there). Dow
 4. **Select the quality** - From "Best" down to 240p (disabled in audio mode)
 5. **Select the format** - mp4 (recommended), webm, or mkv
 6. **Click "Download"** - The application starts downloading and shows the progress
-7. **Files in the downloads folder** - Downloaded files will be in the `downloads` folder in the application directory (snap: `YouTube Downloader` in your Downloads folder)
+7. **Files in the downloads folder** - Downloaded files will be in the `downloads` folder in the application directory (snap and the macOS app from the `.dmg`: `YouTube Downloader` in your Downloads folder)
 
 The interface language can be changed in **View → Language** (Polski / English). On first launch it follows the system language.
 
@@ -420,9 +439,9 @@ The interface language can be changed in **View → Language** (Polski / English
 The application is not code-signed or notarized (that requires a paid Apple Developer Program account, which this project does not currently have). On first launch, macOS Gatekeeper will refuse to open it with a warning that it is "from an unidentified developer" or "cannot be verified." You only need to do one of the following once:
 
 1. **Recommended (works on macOS 15 Sequoia and later, and on older versions too)**: attempt to open the app - it will be blocked - then go to **System Settings -> Privacy & Security**, scroll down to the blocked-app notice, and click **"Open Anyway"**. (The older right-click/Control-click -> "Open" workaround no longer shows an "Open Anyway" option starting with macOS 15 Sequoia.)
-2. **Terminal alternative**: clear the quarantine attribute directly: `xattr -d com.apple.quarantine <path-to-binary>`
+2. **Terminal alternative**: clear the quarantine attribute directly: `xattr -dr com.apple.quarantine "/Applications/YouTube Downloader.app"` (for the `.zip`: `xattr -d com.apple.quarantine <path-to-binary>`)
 
-This does not need to be repeated on subsequent launches of the same file. Note: the release `.zip` asset (built via `Compress-Archive` in CI) does not preserve the Unix executable bit - after unzipping on macOS or Linux, you'll need to run `chmod +x <path-to-binary>` before the app can be launched at all, regardless of the Gatekeeper step above.
+This does not need to be repeated on subsequent launches of the same file. Note (the `.zip` only, not the `.dmg`): the release `.zip` asset (built via `Compress-Archive` in CI) does not preserve the Unix executable bit - after unzipping on macOS or Linux, you'll need to run `chmod +x <path-to-binary>` before the app can be launched at all, regardless of the Gatekeeper step above.
 
 ### 📂 Project Structure
 
@@ -455,6 +474,7 @@ YouTube-Downloader/
 ├── logo.svg                     # Logo with the app name (SVG), at the top of this file
 ├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64
 ├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64/osx-x64/osx-arm64
+├── macos/                       # macOS installer: .app bundle, icon, .dmg (package.sh) and its test (smoke-test.sh)
 ├── snap/                        # Snap Store package (snapcraft.yaml, menu entry)
 ├── README.md                    # Project documentation
 ├── LICENSE                      # Apache 2.0 license

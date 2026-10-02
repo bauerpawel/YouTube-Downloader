@@ -29,6 +29,7 @@ internal static class AppPaths
 
     private static readonly Lazy<string> downloadsDirectory = new(() => ResolveDownloadsDirectory(
         IsSnap,
+        AppBundlePath != null,
         AppContext.BaseDirectory,
         Environment.GetEnvironmentVariable("SNAP_REAL_HOME"),
         Environment.GetEnvironmentVariable("SNAP_USER_COMMON"),
@@ -38,8 +39,27 @@ internal static class AppPaths
 
     public static string DataDirectory => dataDirectory.Value;
 
-    // Next to the app, except in a snap: $SNAP is read-only there.
+    // Next to the app, except in a snap ($SNAP is read-only there) and in a macOS
+    // .app bundle (it must stay unmodified and self-update replaces it whole).
     public static string DownloadsDirectory => downloadsDirectory.Value;
+
+    // macOS installed from the .dmg: the exe runs from <name>.app/Contents/MacOS.
+    // null for the plain macOS folder (the .zip) and on every other OS.
+    public static string? AppBundlePath { get; } =
+        OperatingSystem.IsMacOS() ? FindAppBundle(AppContext.BaseDirectory) : null;
+
+    public static string? FindAppBundle(string appDirectory)
+    {
+        var macOs = new DirectoryInfo(Path.TrimEndingDirectorySeparator(Path.GetFullPath(appDirectory)));
+        DirectoryInfo? contents = macOs.Parent;
+        DirectoryInfo? bundle = contents?.Parent;
+
+        if (bundle == null || macOs.Name != "MacOS" || contents!.Name != "Contents"
+            || !bundle.Name.EndsWith(".app", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        return bundle.FullName;
+    }
 
     private static readonly Lazy<bool> isSnap = new(() =>
         IsRunningFromSnap(Environment.GetEnvironmentVariable("SNAP"), AppContext.BaseDirectory));
@@ -76,12 +96,15 @@ internal static class AppPaths
     // folder of our own. $HOME is ~/snap/<name>/<revision> there; snapd passes
     // the real one in SNAP_REAL_HOME. Without it (old snapd) $SNAP_USER_COMMON,
     // never the versioned $HOME: snapd copies that on every refresh, videos
-    // included.
-    public const string SnapDownloadsFolderName = "YouTube Downloader";
+    // included. A macOS .app bundle uses ~/Downloads plus the same folder.
+    public const string UserDownloadsFolderName = "YouTube Downloader";
 
-    public static string ResolveDownloadsDirectory(bool isSnap, string appDirectory, string? snapRealHome,
-        string? snapUserCommon, string userProfile)
+    public static string ResolveDownloadsDirectory(bool isSnap, bool isAppBundle, string appDirectory,
+        string? snapRealHome, string? snapUserCommon, string userProfile)
     {
+        if (isAppBundle)
+            return Path.Combine(userProfile, "Downloads", UserDownloadsFolderName);
+
         if (!isSnap)
             return Path.Combine(appDirectory, "downloads");
 
@@ -89,7 +112,7 @@ internal static class AppPaths
             : !string.IsNullOrEmpty(snapUserCommon) ? snapUserCommon
             : userProfile;
         string? userDirs = TryReadAllText(Path.Combine(realHome, ".config", "user-dirs.dirs"));
-        return Path.Combine(ResolveUserDownloadDirectory(userDirs, realHome), SnapDownloadsFolderName);
+        return Path.Combine(ResolveUserDownloadDirectory(userDirs, realHome), UserDownloadsFolderName);
     }
 
     // xdg-user-dirs format: XDG_DOWNLOAD_DIR="$HOME/Pobrane" or an absolute path;
