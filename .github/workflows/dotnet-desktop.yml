@@ -384,7 +384,7 @@ jobs:
           ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}-app.zip
           ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
 
-  # Snap Store package yt-downloader-bp (docs/superpowers/specs/2026-09-30-snap-store-design.md).
+  # Snap Store package yt-downloader-bp.
   # Packs the linux single-file binaries the publish job just built and
   # smoke-tested, tests the installed snap, then releases it to stable. Runs
   # after publish, so a failing snap never holds back the GitHub Release. The
