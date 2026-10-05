@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -36,12 +37,22 @@ internal static class ComponentHealth
         TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cancellation.CancelAfter(timeout ?? TimeSpan.FromSeconds(15));
+        // Initial tool startup under Rosetta can exceed 15 seconds (including
+        // Deno and yt-dlp). Keep checks bounded without rejecting those valid
+        // binaries. User cancellation still interrupts the check immediately.
+        var deadline = timeout ?? (OperatingSystem.IsMacOS() &&
+            RuntimeInformation.ProcessArchitecture == Architecture.X64
+                ? TimeSpan.FromSeconds(90) : TimeSpan.FromSeconds(15));
+        cancellation.CancelAfter(deadline);
+        var elapsed = Stopwatch.StartNew();
         bool recognized = false;
+        string output = "";
         try
         {
-            var (code, _) = await ProcessRunner.RunAsync(command, line =>
+            var (code, error) = await ProcessRunner.RunAsync(command, line =>
             {
+                if (output.Length < 4096)
+                    output += line + Environment.NewLine;
                 recognized |= tool switch
                 {
                     ComponentTool.YtDlp => Regex.IsMatch(line, @"\A\d{4}\.\d{2}\.\d{2}(?:\D|$)"),
@@ -52,15 +63,27 @@ internal static class ComponentHealth
                     _ => false
                 };
             }, cancellation.Token);
+            if (code != 0 || !recognized)
+                Console.WriteLine($"[component] {tool}: version check failed (exit {code}). " +
+                    $"stdout: {output.Trim()} stderr: {error[..Math.Min(error.Length, 4096)].Trim()}");
+            else if (elapsed.Elapsed >= TimeSpan.FromSeconds(15))
+                Console.WriteLine($"[component] {tool}: version check passed in {elapsed.Elapsed.TotalSeconds:F1} seconds.");
             return code == 0 && recognized;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or
-            UnauthorizedAccessException or InvalidOperationException or OperationCanceledException)
+        catch (OperationCanceledException)
         {
+            Console.WriteLine($"[component] {tool}: version check timed out after {deadline.TotalSeconds} seconds. " +
+                $"stdout: {output.Trim()}");
+            return false;
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or
+            UnauthorizedAccessException or InvalidOperationException)
+        {
+            Console.WriteLine($"[component] {tool}: version check failed: {ex.Message}");
             return false;
         }
     }

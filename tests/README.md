@@ -28,6 +28,8 @@ MP4/MKV, pojedynczy strumień zapisywany jako MKV, MP3 i błąd przy braku
 strumieni WebM. Nie pobiera filmów z YouTube. Brak narzędzi powoduje błąd testu.
 
 CI uruchamia testy .NET w Debug i Release na trzech systemach, zachowuje raporty
-TRX oraz wykonuje testy multimedialne na Linuksie. Obie grupy muszą przejść przed
-publikacją. Testy te nie zastępują sprawdzenia interakcji GUI i prawdziwego
-pobierania z YouTube.
+TRX, wykonuje testy multimedialne na Linuksie oraz sprawdza uruchomienie paczek
+macOS x64 i ARM64 wraz z pobraniem i weryfikacją komponentów. Wszystkie te
+kontrole muszą przejść przed publikacją. Błąd uruchomienia macOS jest zapisywany
+również w adnotacjach GitHub Actions. Testy te nie zastępują sprawdzenia pełnej
+interakcji GUI i prawdziwego pobierania z YouTube.

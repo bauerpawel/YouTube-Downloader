@@ -40,7 +40,8 @@ public class ComponentHealthTests
     {
         using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ComponentHealth.CheckCommandAsync(
-            Probe("yt-dlp", "hang"), ComponentTool.YtDlp, cancellationToken: cancellation.Token));
+            Probe("deno", "hang"), ComponentTool.Deno, timeout: TimeSpan.FromMinutes(2),
+            cancellationToken: cancellation.Token));
     }
 
     [Fact]

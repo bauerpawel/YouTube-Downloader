@@ -333,6 +333,12 @@ old components still work. Regression tests cover interrupted transfers, hashes,
 failed extraction/probes, file/directory rollback and unsuccessful process exit codes.
 CI smoke tests also require the application's verified readiness status, including
 the JavaScript runtime and ffprobe, instead of passing on file existence alone.
+Version checks normally have a 15-second deadline. macOS x64 uses 90 seconds
+because initial tool startup under Rosetta can exceed 15 seconds; caller
+cancellation still interrupts it. Failed probes log exit status and bounded
+output, or the elapsed timeout, for diagnosis. The `macos-startup` CI job checks
+both architectures before publication and reports failed application logs as
+GitHub Actions annotations through `tests/macos_smoke.sh`.
 
 The application embeds its fonts: `Avalonia.Fonts.Inter` is registered by
 `WithInterFont()` in `Program.BuildAvaloniaApp()`, and the status TextBlock uses

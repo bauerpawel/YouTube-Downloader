@@ -97,8 +97,40 @@ jobs:
     - name: Test format selection and conversion with local media
       run: python tests/media_smoke.py --argument-helper tests/YouTubeDownloader.Tests/bin/Release/net10.0/YouTubeDownloader.Tests.dll
 
+  macos-startup:
+    runs-on: macos-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        rid: [osx-x64, osx-arm64]
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+    - name: Install Rosetta for the Intel startup test
+      if: matrix.rid == 'osx-x64'
+      run: sudo softwareupdate --install-rosetta --agree-to-license
+    - name: Publish macOS test application
+      run: dotnet publish -c Release -r ${{ matrix.rid }} --self-contained true -p:PublishSingleFile=false -o ./startup-publish
+    - name: Sign macOS test application
+      run: |
+        codesign --sign - --force --deep ./startup-publish/YouTubeDownloader
+        find ./startup-publish -name '*.dylib' -exec codesign --sign - --force {} \;
+    - name: Verify application and downloaded components
+      env:
+        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: bash tests/macos_smoke.sh ./startup-publish
+
   publish:
-    needs: [build, media-tests]
+    needs: [build, media-tests, macos-startup]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # not on forked PRs
 
     strategy:
