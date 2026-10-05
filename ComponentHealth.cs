@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 
@@ -36,7 +37,14 @@ internal static class ComponentHealth
         TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cancellation.CancelAfter(timeout ?? TimeSpan.FromSeconds(15));
+        // The first start of the large Deno x64 binary under Rosetta can exceed
+        // 15 seconds. Other tools keep the usual deadline; user cancellation
+        // still interrupts this longer check immediately.
+        var deadline = timeout ?? (tool == ComponentTool.Deno && OperatingSystem.IsMacOS() &&
+            RuntimeInformation.ProcessArchitecture == Architecture.X64
+                ? TimeSpan.FromSeconds(90) : TimeSpan.FromSeconds(15));
+        cancellation.CancelAfter(deadline);
+        var elapsed = Stopwatch.StartNew();
         bool recognized = false;
         string output = "";
         try
@@ -58,14 +66,21 @@ internal static class ComponentHealth
             if (code != 0 || !recognized)
                 Console.WriteLine($"[component] {tool}: version check failed (exit {code}). " +
                     $"stdout: {output.Trim()} stderr: {error[..Math.Min(error.Length, 4096)].Trim()}");
+            else if (elapsed.Elapsed >= TimeSpan.FromSeconds(15))
+                Console.WriteLine($"[component] {tool}: version check passed in {elapsed.Elapsed.TotalSeconds:F1} seconds.");
             return code == 0 && recognized;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine($"[component] {tool}: version check timed out after {deadline.TotalSeconds} seconds.");
+            return false;
+        }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or
-            UnauthorizedAccessException or InvalidOperationException or OperationCanceledException)
+            UnauthorizedAccessException or InvalidOperationException)
         {
             Console.WriteLine($"[component] {tool}: version check failed: {ex.Message}");
             return false;
