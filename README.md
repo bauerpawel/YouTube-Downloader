@@ -59,6 +59,7 @@ YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64)
 - 📦 **Automatyczne zarządzanie zależnościami** - Automatyczne pobieranie yt-dlp, FFmpeg i Deno
 - 🎯 **Wybór jakości** - Najlepsza, 4K, 1080p, 720p, 480p, 360p, 240p
 - 📁 **Wybór formatu** - mp4, webm, mkv
+- ⏹️ **Anulowanie pobierania** - Przycisk „Anuluj” zatrzymuje bieżące pobieranie i pozostałe linki w kolejce
 - 📊 **Pasek postępu** - Wizualizacja postępu pobierania w czasie rzeczywistym
 - 🔄 **Aktualizacja komponentów** - Łatwa aktualizacja yt-dlp i FFmpeg z poziomu aplikacji
 - 🇵🇱🇬🇧 **Interfejs PL/EN** - Polski i angielski, wybór w menu Widok → Język
@@ -192,6 +193,10 @@ Pobrane pliki trafiają do `~/Downloads/YouTube Downloader` (w Finderze: Pobrane
 
 Język interfejsu zmienisz w menu **Widok → Język** (Polski / English). Przy pierwszym uruchomieniu dobierany jest do języka systemu.
 
+Podczas pobierania możesz kliknąć **Anuluj**. Ukończone pliki zostają zachowane, a pliki częściowe pozostają do ewentualnego wznowienia przy ponownym pobraniu. Zamknięcie okna także zatrzymuje pobieranie. WebM wymaga dostępnych strumieni WebM; jeśli film ich nie oferuje, wybierz MP4 lub MKV.
+
+Instrukcje uruchamiania testów są w [tests/README.md](tests/README.md).
+
 ### 🔒 Gatekeeper (macOS)
 
 Aplikacja nie jest podpisana ani notaryzowana (wymagałoby to płatnego konta Apple Developer Program, którego projekt obecnie nie posiada). Przy pierwszym uruchomieniu macOS Gatekeeper wyświetli ostrzeżenie, że aplikacja pochodzi od "niezidentyfikowanego dewelopera" lub "nie może zostać zweryfikowana". Aby ją uruchomić, wystarczy raz wykonać jedną z poniższych czynności:
@@ -301,6 +306,7 @@ YouTube Downloader is a Windows, Linux, and macOS desktop application built with
 - 📦 **Automatic dependency management** - Auto-downloads yt-dlp, FFmpeg, and Deno
 - 🎯 **Quality selection** - Best, 4K, 1080p, 720p, 480p, 360p, 240p
 - 📁 **Format selection** - mp4, webm, mkv
+- ⏹️ **Download cancellation** - The Cancel button stops the active download and the remaining links in the queue
 - 📊 **Progress bar** - Real-time download progress visualization
 - 🔄 **Component updates** - Easy updates for yt-dlp and FFmpeg from within the app
 - 🇵🇱🇬🇧 **PL/EN interface** - Polish and English, switchable in View → Language
@@ -433,6 +439,10 @@ Downloads go to `~/Downloads/YouTube Downloader`. On the first download macOS as
 7. **Files in the downloads folder** - Downloaded files will be in the `downloads` folder in the application directory (snap and the macOS app from the `.dmg`: `YouTube Downloader` in your Downloads folder)
 
 The interface language can be changed in **View → Language** (Polski / English). On first launch it follows the system language.
+
+Click **Cancel** during downloading to stop the batch. Completed files are retained, and partial files are kept for possible resumption on a subsequent download. Closing the window also stops downloading. WebM requires available WebM streams; choose MP4 or MKV if the video does not offer them.
+
+Test instructions are in [tests/README.md](tests/README.md).
 
 ### 🔒 Gatekeeper (macOS)
 

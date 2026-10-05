@@ -6,9 +6,8 @@ using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -31,6 +30,11 @@ public partial class MainWindow : Window
     private readonly string denoPath;
     private readonly string denoVersionPath;
     private readonly string nodeJsPath;
+    private bool isBusy;
+    private bool componentsReady;
+    private CancellationTokenSource? downloadCancellation;
+    private Task? downloadTask;
+    private bool closeAfterDownload;
 
     private static Strings Ui => Strings.Current;
 
@@ -69,10 +73,31 @@ public partial class MainWindow : Window
         CbFormat.SelectedIndex = 0;
 
         ApplyTexts();
-        LblStatus.Text = Ui.StatusReady;
+        LblStatus.Text = Ui.StatusCheckingComponents;
 
         BtnAddUrl.Click += BtnAddUrl_Click;
-        BtnDownload.Click += async (s, e) => await BtnDownload_Click();
+        BtnDownload.Click += async (s, e) =>
+        {
+            if (isBusy || closeAfterDownload)
+                return;
+            downloadTask = BtnDownload_Click();
+            try { await downloadTask; }
+            finally { downloadTask = null; }
+        };
+        BtnCancelDownload.Click += (s, e) => CancelDownload();
+        Closing += async (s, e) =>
+        {
+            if (downloadCancellation == null)
+                return;
+            e.Cancel = true;
+            if (closeAfterDownload)
+                return;
+            closeAfterDownload = true;
+            CancelDownload();
+            if (downloadTask != null)
+                await downloadTask;
+            Close();
+        };
         MiAktualizujKomponenty.Click += async (s, e) => await AktualizujKomponenty_Click();
         MiSprawdzAktualizacje.Click += async (s, e) => await CheckForAppUpdate(silent: false);
         MiInformacje.Click += async (s, e) => await Informacje_Click();
@@ -89,6 +114,7 @@ public partial class MainWindow : Window
         MiThemeSystem.IsChecked = currentTheme == "Default";
 
         Opened += (s, e) => CheckAndDownloadComponents();
+        SetBusy(true);
     }
 
     private void SetTheme(string name)
@@ -127,6 +153,7 @@ public partial class MainWindow : Window
         LblQuality.Text = Ui.LabelQuality;
         LblFormat.Text = Ui.LabelFormat;
         BtnDownload.Content = Ui.ButtonDownload;
+        BtnCancelDownload.Content = Ui.ButtonCancelDownload;
         foreach (var box in extraUrlBoxes)
             box.PlaceholderText = Ui.PlaceholderExtraUrl;
 
@@ -152,8 +179,8 @@ public partial class MainWindow : Window
     private void ContentType_Changed(object? sender, SelectionChangedEventArgs e)
     {
         bool isAudioOnly = CbContentType.SelectedIndex == 1;
-        CbQuality.IsEnabled = !isAudioOnly;
-        CbFormat.IsEnabled = !isAudioOnly;
+        CbQuality.IsEnabled = CbContentType.IsEnabled && !isAudioOnly;
+        CbFormat.IsEnabled = CbContentType.IsEnabled && !isAudioOnly;
     }
 
     private void BtnAddUrl_Click(object? sender, RoutedEventArgs e)
@@ -188,6 +215,18 @@ public partial class MainWindow : Window
         BtnAddUrl.IsEnabled = enabled;
         foreach (var box in extraUrlBoxes) box.IsEnabled = enabled;
         foreach (var btn in removeUrlButtons) btn.IsEnabled = enabled;
+        CbContentType.IsEnabled = enabled;
+        CbQuality.IsEnabled = enabled && CbContentType.SelectedIndex != 1;
+        CbFormat.IsEnabled = enabled && CbContentType.SelectedIndex != 1;
+    }
+
+    private void CancelDownload()
+    {
+        if (downloadCancellation == null || downloadCancellation.IsCancellationRequested)
+            return;
+        BtnCancelDownload.IsEnabled = false;
+        UpdateStatus(Ui.StatusCancelling);
+        downloadCancellation.Cancel();
     }
 
     private List<string> GetAllUrls()
@@ -210,7 +249,8 @@ public partial class MainWindow : Window
     // otherwise cut a component download short and leave a truncated binary behind).
     private void SetBusy(bool busy)
     {
-        BtnDownload.IsEnabled = !busy;
+        isBusy = busy;
+        BtnDownload.IsEnabled = !busy && componentsReady;
         MiSprawdzAktualizacje.IsEnabled = !busy;
         MiAktualizujKomponenty.IsEnabled = !busy;
     }
@@ -220,55 +260,76 @@ public partial class MainWindow : Window
     private async void CheckAndDownloadComponents()
     {
         SetBusy(true);
+        componentsReady = false;
         UpdateStatus(Ui.StatusCheckingComponents);
-
-        bool hasRuntime = File.Exists(denoPath) || File.Exists(nodeJsPath) || IsRuntimeInPath();
-        if (!hasRuntime)
-            await DownloadDeno();
-
-        if (!File.Exists(ytDlpPath))
-        {
-            UpdateStatus(Ui.StatusDownloadingYtDlp);
-            await DownloadYtDlp();
-        }
-
-        if (!Directory.Exists(ffmpegBinPath))
-        {
-            UpdateStatus(Ui.StatusDownloadingFFmpeg);
-            await DownloadFFmpeg();
-        }
-
-        UpdateStatus(Ui.StatusAllComponentsReady);
-
-        // Versions before the data directory kept the tools next to the exe. Remove
-        // those copies only once working replacements exist in the data directory.
-        if (File.Exists(ytDlpPath) && Directory.Exists(ffmpegBinPath) && !string.IsNullOrEmpty(GetRuntimePath()))
-            AppPaths.CleanupLegacyFiles(appDirectory, dataDirectory);
-
-        SetBusy(false);
-
-        // async void caller: nothing may escape from here, and the startup check
-        // must never bother the user with errors (offline, API rate limit).
         try
         {
-            await CheckForAppUpdate(silent: true);
+            if (string.IsNullOrEmpty(await GetRuntimePathAsync()))
+                await DownloadDeno();
+            if (!await ComponentHealth.CheckExecutableAsync(ytDlpPath, ComponentTool.YtDlp))
+            {
+                UpdateStatus(Ui.StatusDownloadingYtDlp);
+                await DownloadYtDlp();
+            }
+            if (!await ComponentHealth.CheckFFmpegAsync(ffmpegBinPath))
+            {
+                UpdateStatus(Ui.StatusDownloadingFFmpeg);
+                await DownloadFFmpeg();
+            }
+
+            await RefreshComponentReadinessAsync();
+            if (componentsReady)
+                AppPaths.CleanupLegacyFiles(appDirectory, dataDirectory);
+        }
+        catch (Exception ex)
+        {
+            componentsReady = false;
+            UpdateStatus(Ui.StatusComponentsUnavailable);
+            if (IsVisible)
+                await MessageDialog.ShowAsync(this, Ui.ErrorWithDetails(ex.Message), Ui.TitleError);
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+
+        try
+        {
+            if (IsVisible)
+                await CheckForAppUpdate(silent: true);
         }
         catch (Exception)
         {
         }
     }
 
-    private bool IsRuntimeInPath() => !string.IsNullOrEmpty(FindSystemDeno());
-
-    private string GetRuntimePath()
+    private async Task<string> GetRuntimePathAsync(CancellationToken cancellationToken = default)
     {
-        if (File.Exists(denoPath))
+        if (await ComponentHealth.CheckExecutableAsync(denoPath, ComponentTool.Deno, cancellationToken))
             return denoPath;
-
-        if (File.Exists(nodeJsPath))
+        if (await ComponentHealth.CheckExecutableAsync(nodeJsPath, ComponentTool.Node, cancellationToken))
             return nodeJsPath;
+        string systemDeno = FindSystemDeno();
+        return await ComponentHealth.CheckExecutableAsync(systemDeno, ComponentTool.Deno, cancellationToken) ? systemDeno : "";
+    }
 
-        return FindSystemDeno();
+    private async Task<(ComponentReadiness Health, string Runtime)> CheckComponentReadinessAsync(
+        CancellationToken cancellationToken = default)
+    {
+        string runtime = await GetRuntimePathAsync(cancellationToken);
+        string extension = OperatingSystem.IsWindows() ? ".exe" : "";
+        var checks = await Task.WhenAll(
+            ComponentHealth.CheckExecutableAsync(ytDlpPath, ComponentTool.YtDlp, cancellationToken),
+            ComponentHealth.CheckExecutableAsync(Path.Combine(ffmpegBinPath, "ffmpeg" + extension), ComponentTool.FFmpeg, cancellationToken),
+            ComponentHealth.CheckExecutableAsync(Path.Combine(ffmpegBinPath, "ffprobe" + extension), ComponentTool.FFprobe, cancellationToken));
+        return (new(checks[0], checks[1], checks[2], !string.IsNullOrEmpty(runtime)), runtime);
+    }
+
+    private async Task RefreshComponentReadinessAsync()
+    {
+        var (health, _) = await CheckComponentReadinessAsync();
+        componentsReady = health.IsReady;
+        UpdateStatus(componentsReady ? Ui.StatusAllComponentsReady : Ui.StatusComponentsUnavailable);
     }
 
     // First `where`/`which` hit outside the app folder. `where` also returns every
@@ -316,80 +377,49 @@ public partial class MainWindow : Window
         return isArm ? "deno-aarch64-unknown-linux-gnu.zip" : "deno-x86_64-unknown-linux-gnu.zip";
     }
 
-    private async Task<(string downloadUrl, string version)> GetLatestDenoInfo()
+    private async Task<ComponentRelease> GetLatestDenoInfo()
     {
-        try
-        {
-            string apiUrl = "https://api.github.com/repos/denoland/deno/releases/latest";
-
-            var response = await GitHubApi.GetStringAsync(httpClient, apiUrl);
-            var jsonDoc = JsonDocument.Parse(response);
-            var root = jsonDoc.RootElement;
-
-            string version = root.GetProperty("tag_name").GetString() ?? "";
-            string assetName = GetDenoAssetName();
-
-            string downloadUrl = "";
-            var assets = root.GetProperty("assets");
-            foreach (var asset in assets.EnumerateArray())
-            {
-                string name = asset.GetProperty("name").GetString() ?? "";
-                if (name.Contains(assetName))
-                {
-                    downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
-                    break;
-                }
-            }
-
-            return (downloadUrl, version);
-        }
-        catch (Exception ex)
-        {
-            await MessageDialog.ShowAsync(this, Ui.ErrorDenoInfo(ex.Message), Ui.TitleError);
-            return ("", "");
-        }
+        string json = await GitHubApi.GetStringAsync(httpClient,
+            "https://api.github.com/repos/denoland/deno/releases/latest");
+        return ComponentRelease.Parse(json, GetDenoAssetName());
     }
 
-    private async Task DownloadDeno()
+    private async Task<bool> DownloadDeno(ComponentRelease? release = null)
     {
         try
         {
             UpdateStatus(Ui.StatusDownloadingDeno);
-
-            var (downloadUrl, version) = await GetLatestDenoInfo();
-
-            if (string.IsNullOrEmpty(downloadUrl))
+            release ??= await GetLatestDenoInfo();
+            var asset = release.Assets[0];
+            await ComponentInstaller.InstallFileAsync(denoPath, async stagedPath =>
             {
-                await MessageDialog.ShowAsync(this, Ui.ErrorDenoNotFound, Ui.TitleError);
-                return;
-            }
-
-            string zipPath = Path.Combine(dataDirectory, "deno.zip");
-            await DownloadFileWithProgress(downloadUrl, zipPath);
-
-            UpdateStatus(Ui.StatusExtractingDeno);
-
-            string denoEntryName = OperatingSystem.IsWindows() ? "deno.exe" : "deno";
-            using (ZipArchive archive = ZipFile.OpenRead(zipPath))
-            {
-                var denoEntry = archive.GetEntry(denoEntryName);
-                if (denoEntry != null)
-                    denoEntry.ExtractToFile(denoPath, true);
-            }
-
-            File.Delete(zipPath);
-
-            AppPaths.MakeExecutable(denoPath);
-
-            if (!string.IsNullOrEmpty(version))
-                await File.WriteAllTextAsync(denoVersionPath, version);
-
+                string zipPath = stagedPath + ".zip";
+                try
+                {
+                    await DownloadFileWithProgress(asset.DownloadUrl, zipPath, asset);
+                    UpdateStatus(Ui.StatusExtractingDeno);
+                    using var archive = ZipFile.OpenRead(zipPath);
+                    string entryName = OperatingSystem.IsWindows() ? "deno.exe" : "deno";
+                    var entry = archive.GetEntry(entryName)
+                        ?? throw new InvalidDataException(Ui.ErrorDenoNotFound);
+                    entry.ExtractToFile(stagedPath);
+                    AppPaths.MakeExecutable(stagedPath);
+                }
+                finally
+                {
+                    AppPaths.TryDeleteFile(zipPath);
+                }
+            }, path => ComponentHealth.CheckExecutableAsync(path, ComponentTool.Deno),
+                denoVersionPath, release.Version);
             UpdateStatus(Ui.StatusDenoInstalled);
+            return true;
         }
         catch (Exception ex)
         {
             UpdateStatus(Ui.StatusDenoError(ex.Message));
-            await MessageDialog.ShowAsync(this, Ui.WarningDenoFailed, Ui.TitleWarning);
+            if (IsVisible)
+                await MessageDialog.ShowAsync(this, Ui.WarningDenoFailed, Ui.TitleWarning);
+            return false;
         }
     }
 
@@ -408,18 +438,27 @@ public partial class MainWindow : Window
         return isArm ? "yt-dlp_linux_aarch64" : "yt-dlp_linux";
     }
 
-    private async Task DownloadYtDlp()
+    private async Task<bool> DownloadYtDlp()
     {
         try
         {
-            string url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/" + GetYtDlpAssetName();
-            await DownloadFileWithProgress(url, ytDlpPath);
-            AppPaths.MakeExecutable(ytDlpPath);
+            string json = await GitHubApi.GetStringAsync(httpClient,
+                "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest");
+            var release = ComponentRelease.Parse(json, GetYtDlpAssetName());
+            var asset = release.Assets[0];
+            await ComponentInstaller.InstallFileAsync(ytDlpPath, async stagedPath =>
+            {
+                await DownloadFileWithProgress(asset.DownloadUrl, stagedPath, asset);
+                AppPaths.MakeExecutable(stagedPath);
+            }, path => ComponentHealth.CheckExecutableAsync(path, ComponentTool.YtDlp));
             UpdateStatus(Ui.StatusYtDlpDownloaded);
+            return true;
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, Ui.ErrorYtDlpDownload(ex.Message), Ui.TitleError);
+            if (IsVisible)
+                await MessageDialog.ShowAsync(this, Ui.ErrorYtDlpDownload(ex.Message), Ui.TitleError);
+            return false;
         }
     }
 
@@ -441,49 +480,11 @@ public partial class MainWindow : Window
         return assetName.EndsWith(suffix);
     }
 
-    private async Task<(string downloadUrl, string version)> GetLatestFFmpegInfo()
+    private async Task<ComponentRelease> GetLatestFFmpegInfo()
     {
-        try
-        {
-            string releasesUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases";
-            var response = await GitHubApi.GetStringAsync(httpClient, releasesUrl);
-            var jsonDoc = JsonDocument.Parse(response);
-            var releases = jsonDoc.RootElement;
-
-            string autobuildTag = "";
-            string downloadUrl = "";
-
-            foreach (var release in releases.EnumerateArray())
-            {
-                string tagName = release.GetProperty("tag_name").GetString() ?? "";
-
-                if (tagName.StartsWith("autobuild-"))
-                {
-                    autobuildTag = tagName;
-
-                    var assets = release.GetProperty("assets");
-                    foreach (var asset in assets.EnumerateArray())
-                    {
-                        string assetName = asset.GetProperty("name").GetString() ?? "";
-                        if (IsMatchingFFmpegAsset(assetName))
-                        {
-                            downloadUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
-                            break;
-                        }
-                    }
-
-                    if (!string.IsNullOrEmpty(downloadUrl))
-                        break;
-                }
-            }
-
-            return (downloadUrl, autobuildTag);
-        }
-        catch (Exception ex)
-        {
-            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpegInfo(ex.Message), Ui.TitleError);
-            return ("", "");
-        }
+        string json = await GitHubApi.GetStringAsync(httpClient,
+            "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases");
+        return ComponentRelease.ParseBuilds(json, IsMatchingFFmpegAsset);
     }
 
     private static string GetFFmpegMacAssetName(bool isFFprobe)
@@ -493,39 +494,12 @@ public partial class MainWindow : Window
         return (isFFprobe ? "ffprobe-darwin-" : "ffmpeg-darwin-") + arch;
     }
 
-    private async Task<(string ffmpegUrl, string ffprobeUrl, string version)> GetLatestFFmpegInfoMac()
+    private async Task<ComponentRelease> GetLatestFFmpegInfoMac()
     {
-        try
-        {
-            string apiUrl = "https://api.github.com/repos/eugeneware/ffmpeg-static/releases/latest";
-
-            var response = await GitHubApi.GetStringAsync(httpClient, apiUrl);
-            var jsonDoc = JsonDocument.Parse(response);
-            var root = jsonDoc.RootElement;
-
-            string version = root.GetProperty("tag_name").GetString() ?? "";
-            string ffmpegAssetName = GetFFmpegMacAssetName(isFFprobe: false);
-            string ffprobeAssetName = GetFFmpegMacAssetName(isFFprobe: true);
-
-            string ffmpegUrl = "";
-            string ffprobeUrl = "";
-            var assets = root.GetProperty("assets");
-            foreach (var asset in assets.EnumerateArray())
-            {
-                string name = asset.GetProperty("name").GetString() ?? "";
-                if (name == ffmpegAssetName)
-                    ffmpegUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
-                else if (name == ffprobeAssetName)
-                    ffprobeUrl = asset.GetProperty("browser_download_url").GetString() ?? "";
-            }
-
-            return (ffmpegUrl, ffprobeUrl, version);
-        }
-        catch (Exception ex)
-        {
-            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpegInfo(ex.Message), Ui.TitleError);
-            return ("", "", "");
-        }
+        string json = await GitHubApi.GetStringAsync(httpClient,
+            "https://api.github.com/repos/eugeneware/ffmpeg-static/releases/latest");
+        return ComponentRelease.Parse(json,
+            GetFFmpegMacAssetName(isFFprobe: false), GetFFmpegMacAssetName(isFFprobe: true));
     }
 
     private static async Task ExtractArchive(string archivePath, string destinationPath)
@@ -552,292 +526,169 @@ public partial class MainWindow : Window
             throw new Exception(Ui.ErrorTarFailed(error));
     }
 
-    private async Task DownloadFFmpeg()
-    {
-        if (OperatingSystem.IsMacOS())
-        {
-            await DownloadFFmpegMac();
-            return;
-        }
-
-        try
-        {
-            UpdateStatus(Ui.StatusFetchingFFmpegInfo);
-            var (downloadUrl, version) = await GetLatestFFmpegInfo();
-
-            if (string.IsNullOrEmpty(downloadUrl))
-                throw new Exception(Ui.ErrorFFmpegLinkNotFound);
-
-            UpdateStatus(Ui.StatusDownloadingFFmpegVersion(version));
-            string archiveExtension = OperatingSystem.IsWindows() ? ".zip" : ".tar.xz";
-            string archivePath = Path.Combine(dataDirectory, "ffmpeg" + archiveExtension);
-
-            await DownloadFileWithProgress(downloadUrl, archivePath);
-
-            UpdateStatus(Ui.StatusExtractingFFmpeg);
-
-            if (Directory.Exists(ffmpegBinPath))
-                Directory.Delete(ffmpegBinPath, true);
-
-            string tempExtractPath = Path.Combine(dataDirectory, "ffmpeg_temp");
-            if (Directory.Exists(tempExtractPath))
-                Directory.Delete(tempExtractPath, true);
-
-            await ExtractArchive(archivePath, tempExtractPath);
-
-            string[] binPaths = Directory.GetDirectories(tempExtractPath, "bin", SearchOption.AllDirectories);
-
-            if (binPaths.Length == 0)
-                throw new Exception(Ui.ErrorFFmpegBinNotFound);
-
-            string sourceBinPath = binPaths[0];
-            Directory.CreateDirectory(ffmpegBinPath);
-
-            foreach (string file in Directory.GetFiles(sourceBinPath))
-            {
-                string fileName = Path.GetFileName(file);
-                string destFile = Path.Combine(ffmpegBinPath, fileName);
-                File.Copy(file, destFile, true);
-                AppPaths.MakeExecutable(destFile);
-            }
-
-            await File.WriteAllTextAsync(ffmpegVersionPath, version);
-
-            File.Delete(archivePath);
-            Directory.Delete(tempExtractPath, true);
-
-            UpdateStatus(Ui.StatusFFmpegDownloaded(version));
-        }
-        catch (Exception ex)
-        {
-            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpeg(ex.Message), Ui.TitleError);
-            UpdateStatus(Ui.ErrorWithDetails(ex.Message));
-        }
-    }
-
-    private async Task DownloadFFmpegMac()
+    private async Task<bool> DownloadFFmpeg(ComponentRelease? release = null)
     {
         try
         {
             UpdateStatus(Ui.StatusFetchingFFmpegInfo);
-            var (ffmpegUrl, ffprobeUrl, version) = await GetLatestFFmpegInfoMac();
-
-            if (string.IsNullOrEmpty(ffmpegUrl) || string.IsNullOrEmpty(ffprobeUrl))
-                throw new Exception(Ui.ErrorFFmpegLinkNotFound);
-
-            UpdateStatus(Ui.StatusDownloadingFFmpegVersion(version));
-
-            if (Directory.Exists(ffmpegBinPath))
-                Directory.Delete(ffmpegBinPath, true);
-            Directory.CreateDirectory(ffmpegBinPath);
-
-            string ffmpegDestPath = Path.Combine(ffmpegBinPath, "ffmpeg");
-            string ffprobeDestPath = Path.Combine(ffmpegBinPath, "ffprobe");
-
-            await DownloadFileWithProgress(ffmpegUrl, ffmpegDestPath);
-            AppPaths.MakeExecutable(ffmpegDestPath);
-
-            await DownloadFileWithProgress(ffprobeUrl, ffprobeDestPath);
-            AppPaths.MakeExecutable(ffprobeDestPath);
-
-            await File.WriteAllTextAsync(ffmpegVersionPath, version);
-
-            UpdateStatus(Ui.StatusFFmpegDownloaded(version));
-        }
-        catch (Exception ex)
-        {
-            // Don't leave behind an empty/partial ffmpeg_bin/ - its mere existence is the
-            // app's only signal that FFmpeg is installed (see CheckAndDownloadComponents()),
-            // so a half-finished download here must not look like a successful install.
-            if (Directory.Exists(ffmpegBinPath))
-                Directory.Delete(ffmpegBinPath, true);
-
-            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpeg(ex.Message), Ui.TitleError);
-            UpdateStatus(Ui.ErrorWithDetails(ex.Message));
-        }
-    }
-
-    private async Task DownloadFileWithProgress(string url, string destinationPath)
-    {
-        using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-        response.EnsureSuccessStatusCode();
-
-        var totalBytes = response.Content.Headers.ContentLength ?? -1L;
-        var canReportProgress = totalBytes != -1;
-
-        using (var contentStream = await response.Content.ReadAsStreamAsync())
-        using (var fileStream = new FileStream(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true))
-        {
-            var buffer = new byte[8192];
-            long totalBytesRead = 0;
-            int bytesRead;
-
-            while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            release ??= OperatingSystem.IsMacOS()
+                ? await GetLatestFFmpegInfoMac() : await GetLatestFFmpegInfo();
+            UpdateStatus(Ui.StatusDownloadingFFmpegVersion(release.Version));
+            var assets = release.Assets;
+            await ComponentInstaller.InstallDirectoryAsync(ffmpegBinPath, async stagedDirectory =>
             {
-                await fileStream.WriteAsync(buffer, 0, bytesRead);
-                totalBytesRead += bytesRead;
-
-                if (canReportProgress)
+                if (OperatingSystem.IsMacOS())
                 {
-                    var progress = (int)((totalBytesRead * 100) / totalBytes);
-                    ProgressBarDownload.Value = Math.Min(progress, 100);
+                    for (int i = 0; i < assets.Count; i++)
+                    {
+                        string path = Path.Combine(stagedDirectory, i == 0 ? "ffmpeg" : "ffprobe");
+                        await DownloadFileWithProgress(assets[i].DownloadUrl, path, assets[i]);
+                        AppPaths.MakeExecutable(path);
+                    }
                 }
-            }
+                else
+                {
+                    string extension = OperatingSystem.IsWindows() ? ".zip" : ".tar.xz";
+                    string archivePath = Path.Combine(stagedDirectory, "ffmpeg" + extension);
+                    string extractPath = Path.Combine(stagedDirectory, "extracted");
+                    await DownloadFileWithProgress(assets[0].DownloadUrl, archivePath, assets[0]);
+                    UpdateStatus(Ui.StatusExtractingFFmpeg);
+                    await ExtractArchive(archivePath, extractPath);
+                    var bins = Directory.GetDirectories(extractPath, "bin", SearchOption.AllDirectories);
+                    if (bins.Length != 1)
+                        throw new InvalidDataException(Ui.ErrorFFmpegBinNotFound);
+                    foreach (string file in Directory.GetFiles(bins[0]))
+                    {
+                        string path = Path.Combine(stagedDirectory, Path.GetFileName(file));
+                        File.Copy(file, path);
+                        AppPaths.MakeExecutable(path);
+                    }
+                    File.Delete(archivePath);
+                    Directory.Delete(extractPath, true);
+                }
+            }, ComponentHealth.CheckFFmpegAsync, ffmpegVersionPath, release.Version);
+            UpdateStatus(Ui.StatusFFmpegDownloaded(release.Version));
+            return true;
         }
-
-        ProgressBarDownload.Value = 0;
+        catch (Exception ex)
+        {
+            if (IsVisible)
+                await MessageDialog.ShowAsync(this, Ui.ErrorFFmpeg(ex.Message), Ui.TitleError);
+            UpdateStatus(Ui.ErrorWithDetails(ex.Message));
+            return false;
+        }
     }
 
-    private async Task CheckAndUpdateDeno()
+    private async Task DownloadFileWithProgress(string url, string destinationPath, ReleaseAsset? asset = null)
     {
         try
         {
-            if (!File.Exists(denoPath))
+            await AtomicDownload.DownloadAsync(httpClient, url, destinationPath,
+                progress => ProgressBarDownload.Value = progress, asset?.Size, asset?.Sha256);
+        }
+        finally
+        {
+            ProgressBarDownload.Value = 0;
+        }
+    }
+
+    private async Task<bool> CheckAndUpdateDeno()
+    {
+        try
+        {
+            if (!File.Exists(denoPath) && !string.IsNullOrEmpty(await GetRuntimePathAsync()))
             {
                 UpdateStatus(Ui.StatusDenoSkipped);
-                return;
+                return true;
             }
-
             UpdateStatus(Ui.StatusCheckingDenoVersion);
-            var (_, latestVersion) = await GetLatestDenoInfo();
-
-            if (string.IsNullOrEmpty(latestVersion))
-                return;
-
-            string currentVersion = "";
-            if (File.Exists(denoVersionPath))
-                currentVersion = await File.ReadAllTextAsync(denoVersionPath);
-
-            if (string.IsNullOrEmpty(currentVersion) || currentVersion != latestVersion)
-            {
-                UpdateStatus(Ui.StatusDenoUpdateAvailable);
-                await DownloadDeno();
-            }
-            else
+            var release = await GetLatestDenoInfo();
+            string current = File.Exists(denoVersionPath) ? (await File.ReadAllTextAsync(denoVersionPath)).Trim() : "";
+            if (current == release.Version && await ComponentHealth.CheckExecutableAsync(denoPath, ComponentTool.Deno))
             {
                 UpdateStatus(Ui.StatusDenoUpToDate);
+                return true;
             }
+            UpdateStatus(Ui.StatusDenoUpdateAvailable);
+            return await DownloadDeno(release);
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, Ui.ErrorDenoUpdate(ex.Message), Ui.TitleError);
+            if (IsVisible)
+                await MessageDialog.ShowAsync(this, Ui.ErrorDenoUpdate(ex.Message), Ui.TitleError);
+            return false;
         }
     }
 
-    private async Task CheckAndUpdateFFmpeg()
+    private async Task<bool> CheckAndUpdateFFmpeg()
     {
         try
         {
-            string latestVersion;
-            if (OperatingSystem.IsMacOS())
-                (_, _, latestVersion) = await GetLatestFFmpegInfoMac();
-            else
-                (_, latestVersion) = await GetLatestFFmpegInfo();
-
-            string currentVersion = "";
-
-            if (File.Exists(ffmpegVersionPath))
-                currentVersion = await File.ReadAllTextAsync(ffmpegVersionPath);
-
-            if (string.IsNullOrEmpty(currentVersion) || currentVersion != latestVersion)
-            {
-                UpdateStatus(Ui.StatusFFmpegUpdateAvailable);
-
-                if (Directory.Exists(ffmpegBinPath))
-                    Directory.Delete(ffmpegBinPath, true);
-
-                await DownloadFFmpeg();
-            }
-            else
+            // Fetch and validate metadata before preparing anything. A failed API
+            // request must never turn into an empty "new version" or a deletion.
+            var release = OperatingSystem.IsMacOS()
+                ? await GetLatestFFmpegInfoMac() : await GetLatestFFmpegInfo();
+            string current = File.Exists(ffmpegVersionPath) ? (await File.ReadAllTextAsync(ffmpegVersionPath)).Trim() : "";
+            if (current == release.Version && await ComponentHealth.CheckFFmpegAsync(ffmpegBinPath))
             {
                 UpdateStatus(Ui.StatusFFmpegUpToDate);
+                return true;
             }
+            UpdateStatus(Ui.StatusFFmpegUpdateAvailable);
+            return await DownloadFFmpeg(release);
         }
         catch (Exception ex)
         {
-            await MessageDialog.ShowAsync(this, Ui.ErrorUpdate(ex.Message), Ui.TitleError);
+            if (IsVisible)
+                await MessageDialog.ShowAsync(this, Ui.ErrorUpdate(ex.Message), Ui.TitleError);
+            return false;
         }
     }
 
     private async Task AktualizujKomponenty_Click()
     {
         bool confirmed = await MessageDialog.ShowConfirmAsync(this, Ui.ConfirmUpdateComponents, Ui.TitleComponentsUpdate);
+        if (!confirmed || isBusy)
+            return;
 
-        if (confirmed)
+        SetBusy(true);
+        try
         {
-            SetBusy(true);
-
             UpdateStatus(Ui.StatusUpdatingYtDlp);
-            if (File.Exists(ytDlpPath))
-            {
-                try
-                {
-                    await ProcessRunner.RunAsync(new ProcessStartInfo
-                    {
-                        FileName = ytDlpPath,
-                        Arguments = "-U",
-                        CreateNoWindow = true
-                    });
-                    UpdateStatus(Ui.StatusYtDlpUpdated);
-                }
-                catch (Exception ex)
-                {
-                    await MessageDialog.ShowAsync(this, Ui.ErrorWithDetails(ex.Message), Ui.TitleError);
-                }
-            }
-
-            await CheckAndUpdateDeno();
-            await CheckAndUpdateFFmpeg();
-            UpdateStatus(Ui.StatusComponentsUpdateDone);
+            bool ytDlpUpdated = await DownloadYtDlp();
+            if (ytDlpUpdated)
+                UpdateStatus(Ui.StatusYtDlpUpdated);
+            bool denoUpdated = await CheckAndUpdateDeno();
+            bool ffmpegUpdated = await CheckAndUpdateFFmpeg();
+            await RefreshComponentReadinessAsync();
+            bool succeeded = ytDlpUpdated && denoUpdated && ffmpegUpdated && componentsReady;
+            UpdateStatus(succeeded ? Ui.StatusComponentsUpdateDone : Ui.StatusComponentsUpdateFailed +
+                (componentsReady ? "" : " " + Ui.StatusComponentsUnavailable));
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus(Ui.StatusComponentsUpdateFailed);
+            if (IsVisible)
+                await MessageDialog.ShowAsync(this, Ui.ErrorWithDetails(ex.Message), Ui.TitleError);
+        }
+        finally
+        {
             SetBusy(false);
         }
     }
 
     // ---- URL handling ----
 
-    private string NormalizeUrl(string url)
-    {
-        if (string.IsNullOrWhiteSpace(url))
-            return "";
-
-        url = url.Trim();
-
-        if (url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
-            url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
-            return url;
-
-        if (url.StartsWith("www.youtube.com", StringComparison.OrdinalIgnoreCase) ||
-            url.StartsWith("youtube.com", StringComparison.OrdinalIgnoreCase) ||
-            url.StartsWith("youtu.be", StringComparison.OrdinalIgnoreCase) ||
-            url.StartsWith("m.youtube.com", StringComparison.OrdinalIgnoreCase))
-            return "https://" + url;
-
-        if (Regex.IsMatch(url, "^[a-zA-Z0-9_-]{11}$"))
-            return "https://www.youtube.com/watch?v=" + url;
-
-        return "https://" + url;
-    }
-
     private bool ValidateUrl(string url)
     {
-        if (string.IsNullOrWhiteSpace(url))
+        if (!YouTubeUrl.TryNormalize(url, out _, out var error))
         {
-            UpdateStatus(Ui.StatusUrlEmpty);
-            return false;
-        }
-
-        string normalizedUrl = NormalizeUrl(url);
-
-        if (!normalizedUrl.Contains("youtube.com") && !normalizedUrl.Contains("youtu.be"))
-        {
-            UpdateStatus(Ui.StatusYouTubeOnly);
-            return false;
-        }
-
-        if (!Uri.TryCreate(normalizedUrl, UriKind.Absolute, out var uriResult) ||
-            (uriResult.Scheme != Uri.UriSchemeHttp && uriResult.Scheme != Uri.UriSchemeHttps))
-        {
-            UpdateStatus(Ui.StatusInvalidUrl);
+            UpdateStatus(error switch
+            {
+                YouTubeUrlError.Empty => Ui.StatusUrlEmpty,
+                YouTubeUrlError.UnsupportedHost => Ui.StatusYouTubeOnly,
+                _ => Ui.StatusInvalidUrl
+            });
             return false;
         }
 
@@ -846,10 +697,12 @@ public partial class MainWindow : Window
 
     // ---- Download flow ----
 
-    private string BuildYtDlpArguments()
+    private ProcessStartInfo BuildYtDlpStartInfo(string normalizedUrl, string runtimePath, string downloadsDir)
     {
         int qualityIndex = Math.Max(CbQuality.SelectedIndex, 0);
-        return YtDlpArguments.Build(
+        return YtDlpArguments.CreateStartInfo(
+            ytDlpPath, runtimePath, ffmpegBinPath,
+            Path.Combine(downloadsDir, "%(title)s.%(ext)s"), normalizedUrl,
             CbContentType.SelectedIndex == 1,
             YtDlpArguments.QualityHeights[qualityIndex],
             CbFormat.SelectedItem?.ToString() ?? "mp4");
@@ -898,14 +751,14 @@ public partial class MainWindow : Window
 
     private async Task BtnDownload_Click()
     {
+        if (isBusy || closeAfterDownload)
+            return;
         List<string> rawUrls = GetAllUrls();
-
         if (rawUrls.Count == 0)
         {
             await MessageDialog.ShowAsync(this, Ui.ErrorNoUrl, Ui.TitleError);
             return;
         }
-
         foreach (string url in rawUrls)
         {
             if (!ValidateUrl(url))
@@ -915,85 +768,80 @@ public partial class MainWindow : Window
             }
         }
 
-        if (!File.Exists(ytDlpPath))
-        {
-            await MessageDialog.ShowAsync(this, Ui.ErrorYtDlpUnavailable, Ui.TitleError);
-            return;
-        }
-
-        if (!Directory.Exists(ffmpegBinPath))
-        {
-            await MessageDialog.ShowAsync(this, Ui.ErrorFFmpegUnavailable, Ui.TitleError);
-            return;
-        }
-
-        string runtimePath = GetRuntimePath();
-        if (string.IsNullOrEmpty(runtimePath))
-        {
-            await MessageDialog.ShowAsync(this, Ui.ErrorNoJsRuntime, Ui.TitleError);
-            return;
-        }
-
+        using var cancellation = new CancellationTokenSource();
+        downloadCancellation = cancellation;
+        BtnCancelDownload.IsVisible = true;
+        BtnCancelDownload.IsEnabled = true;
         SetBusy(true);
         SetUrlRowsEnabled(false);
-
-        int successCount = 0;
-        string downloadsDir = AppPaths.DownloadsDirectory;
-
-        for (int i = 0; i < rawUrls.Count; i++)
+        try
         {
+            var (health, runtimePath) = await CheckComponentReadinessAsync(cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            componentsReady = health.IsReady;
+            if (!componentsReady)
+            {
+                UpdateStatus(Ui.StatusComponentsUnavailable);
+                string message = !health.YtDlp ? Ui.ErrorYtDlpUnavailable
+                    : !health.FFmpeg || !health.FFprobe ? Ui.ErrorFFmpegUnavailable : Ui.ErrorNoJsRuntime;
+                await MessageDialog.ShowAsync(this, message, Ui.TitleError);
+                return;
+            }
+
+            string downloadsDir = AppPaths.DownloadsDirectory;
+            var result = await DownloadBatch.RunAsync(rawUrls, async (url, i, token) =>
+            {
+                ProgressBarDownload.Value = 0;
+                string statusPrefix = rawUrls.Count > 1 ? $"[{i + 1}/{rawUrls.Count}] " : "";
+                UpdateStatus(statusPrefix + Ui.StatusPreparing);
+                return await DownloadSingleUrlAsync(url, runtimePath, statusPrefix, token);
+            }, cancellation.Token);
+
+            if (result.Cancelled)
+            {
+                UpdateStatus(Ui.StatusDownloadCancelled(result.Completed, rawUrls.Count));
+            }
+            else if (result.Completed == rawUrls.Count)
+            {
+                UpdateStatus(Ui.StatusDownloadFinished);
+                await MessageDialog.ShowAsync(this, Ui.MessageDownloaded(rawUrls.Count > 1, downloadsDir), Ui.TitleSuccess);
+            }
+            else
+            {
+                UpdateStatus(Ui.StatusFinishedCount(result.Completed, rawUrls.Count));
+                await MessageDialog.ShowAsync(this, Ui.MessageDownloadedCount(result.Completed, rawUrls.Count), Ui.TitleFinishedWithErrors);
+            }
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            UpdateStatus(Ui.StatusDownloadCancelled(0, rawUrls.Count));
+        }
+        catch (Exception ex)
+        {
+            UpdateStatus(Ui.StatusFailed);
+            await MessageDialog.ShowAsync(this, Ui.ErrorWithDetails(ex.Message), Ui.TitleError);
+        }
+        finally
+        {
+            downloadCancellation = null;
+            BtnCancelDownload.IsVisible = false;
+            SetBusy(false);
+            SetUrlRowsEnabled(true);
             ProgressBarDownload.Value = 0;
-
-            string statusPrefix = rawUrls.Count > 1 ? $"[{i + 1}/{rawUrls.Count}] " : "";
-            UpdateStatus(statusPrefix + Ui.StatusPreparing);
-
-            bool success = await DownloadSingleUrlAsync(rawUrls[i], runtimePath, statusPrefix);
-            if (success)
-                successCount++;
-        }
-
-        SetBusy(false);
-        SetUrlRowsEnabled(true);
-        ProgressBarDownload.Value = 0;
-
-        if (successCount == rawUrls.Count)
-        {
-            UpdateStatus(Ui.StatusDownloadFinished);
-            await MessageDialog.ShowAsync(this, Ui.MessageDownloaded(rawUrls.Count > 1, downloadsDir), Ui.TitleSuccess);
-        }
-        else
-        {
-            UpdateStatus(Ui.StatusFinishedCount(successCount, rawUrls.Count));
-            await MessageDialog.ShowAsync(this, Ui.MessageDownloadedCount(successCount, rawUrls.Count), Ui.TitleFinishedWithErrors);
         }
     }
 
-    private async Task<bool> DownloadSingleUrlAsync(string rawUrl, string runtimePath, string statusPrefix)
+    private async Task<bool> DownloadSingleUrlAsync(string rawUrl, string runtimePath, string statusPrefix,
+        CancellationToken cancellationToken)
     {
+        bool reportProgress = true;
         try
         {
-            string normalizedUrl = NormalizeUrl(rawUrl);
-            string ytDlpArgs = BuildYtDlpArguments();
+            if (!YouTubeUrl.TryNormalize(rawUrl, out string normalizedUrl, out _))
+                throw new ArgumentException(Ui.ErrorInvalidLink(rawUrl));
+
             string downloadsDir = AppPaths.DownloadsDirectory;
-            string outputPattern = Path.Combine(downloadsDir, "%(title)s.%(ext)s");
-
-            StringBuilder argBuilder = new StringBuilder();
-            argBuilder.Append(YtDlpArguments.JsRuntime(runtimePath));
-            argBuilder.Append(ytDlpArgs);
-            argBuilder.Append(" --ffmpeg-location \"");
-            argBuilder.Append(ffmpegBinPath);
-            argBuilder.Append("\" --progress --newline -o \"");
-            argBuilder.Append(outputPattern);
-            argBuilder.Append("\" \"");
-            argBuilder.Append(normalizedUrl);
-            argBuilder.Append("\"");
-
-            var processInfo = new ProcessStartInfo
-            {
-                FileName = ytDlpPath,
-                Arguments = argBuilder.ToString(),
-                CreateNoWindow = true
-            };
+            var processInfo = BuildYtDlpStartInfo(normalizedUrl, runtimePath, downloadsDir);
 
             Directory.CreateDirectory(downloadsDir);
 
@@ -1004,6 +852,8 @@ public partial class MainWindow : Window
 
                 Dispatcher.UIThread.Post(() =>
                 {
+                    if (!reportProgress || cancellationToken.IsCancellationRequested)
+                        return;
                     if (data.Contains("[download]"))
                     {
                         ParseDownloadProgress(data, statusPrefix);
@@ -1013,7 +863,7 @@ public partial class MainWindow : Window
                         LblStatus.Text = statusPrefix + data;
                     }
                 });
-            });
+            }, cancellationToken);
 
             if (exitCode == 0)
             {
@@ -1028,11 +878,19 @@ public partial class MainWindow : Window
                 return false;
             }
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             UpdateStatus(statusPrefix + Ui.StatusFailed);
             await MessageDialog.ShowAsync(this, Ui.ErrorDownloadFailed(rawUrl, ex.Message), Ui.TitleError);
             return false;
+        }
+        finally
+        {
+            reportProgress = false;
         }
     }
 
@@ -1057,7 +915,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (!BtnDownload.IsEnabled)
+        if (isBusy)
             return;
 
         ReleaseInfo release;
@@ -1087,7 +945,7 @@ public partial class MainWindow : Window
         }
 
         // The user may have started a download while GitHub was being queried.
-        if (!BtnDownload.IsEnabled)
+        if (isBusy)
             return;
 
         bool confirmed = await MessageDialog.ShowConfirmAsync(this,

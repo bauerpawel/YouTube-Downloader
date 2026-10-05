@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace YouTubeDownloader;
@@ -11,7 +12,8 @@ namespace YouTubeDownloader;
 internal static class ProcessRunner
 {
     public static async Task<(int ExitCode, string StandardError)> RunAsync(
-        ProcessStartInfo startInfo, Action<string>? onOutputLine = null)
+        ProcessStartInfo startInfo, Action<string>? onOutputLine = null,
+        CancellationToken cancellationToken = default)
     {
         startInfo.UseShellExecute = false;
         startInfo.RedirectStandardOutput = true;
@@ -24,12 +26,32 @@ internal static class ProcessRunner
                 onOutputLine?.Invoke(e.Data);
         };
 
+        cancellationToken.ThrowIfCancellationRequested();
         process.Start();
         process.BeginOutputReadLine();
         Task<string> standardError = process.StandardError.ReadToEndAsync();
 
         // Also waits for the stdout events to reach end of stream.
-        await process.WaitForExitAsync();
-        return (process.ExitCode, await standardError);
+        try
+        {
+            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException)
+        {
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (InvalidOperationException)
+            {
+                // The process can exit between HasExited and Kill.
+            }
+            await process.WaitForExitAsync().ConfigureAwait(false);
+            await standardError.ConfigureAwait(false);
+            throw;
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return (process.ExitCode, await standardError.ConfigureAwait(false));
     }
 }

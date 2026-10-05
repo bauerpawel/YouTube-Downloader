@@ -30,6 +30,7 @@ internal sealed class Strings
     public required string LabelQuality { get; init; }
     public required string LabelFormat { get; init; }
     public required string ButtonDownload { get; init; }
+    public required string ButtonCancelDownload { get; init; }
     public required string PlaceholderExtraUrl { get; init; }
     public required string ContentTypeVideoAudio { get; init; }
     public required string ContentTypeAudioOnly { get; init; }
@@ -53,6 +54,7 @@ internal sealed class Strings
     public required string StatusExtractingFFmpeg { get; init; }
     public required Func<string, string> StatusFFmpegDownloaded { get; init; }
     public required string StatusAllComponentsReady { get; init; }
+    public required string StatusComponentsUnavailable { get; init; }
     public required string StatusDenoSkipped { get; init; }
     public required string StatusCheckingDenoVersion { get; init; }
     public required string StatusDenoUpdateAvailable { get; init; }
@@ -62,6 +64,7 @@ internal sealed class Strings
     public required string StatusUpdatingYtDlp { get; init; }
     public required string StatusYtDlpUpdated { get; init; }
     public required string StatusComponentsUpdateDone { get; init; }
+    public required string StatusComponentsUpdateFailed { get; init; }
     public required string StatusUrlEmpty { get; init; }
     public required string StatusYouTubeOnly { get; init; }
     public required string StatusInvalidUrl { get; init; }
@@ -70,6 +73,8 @@ internal sealed class Strings
     public required string StatusDownloadError { get; init; }
     public required string StatusFailed { get; init; }
     public required string StatusDownloadFinished { get; init; }
+    public required string StatusCancelling { get; init; }
+    public required Func<int, int, string> StatusDownloadCancelled { get; init; }
     public required Func<int, int, string> StatusFinishedCount { get; init; }
     public required Func<int, string> StatusDownloadingAppUpdate { get; init; }
     public required string StatusInstallingAppUpdate { get; init; }
@@ -149,6 +154,7 @@ internal sealed class Strings
         LabelQuality = "Jakość:",
         LabelFormat = "Format:",
         ButtonDownload = "Pobierz",
+        ButtonCancelDownload = "Anuluj",
         PlaceholderExtraUrl = "Wklej kolejny link do filmu...",
         ContentTypeVideoAudio = "Wideo + Audio",
         ContentTypeAudioOnly = "Tylko Audio (MP3)",
@@ -171,6 +177,7 @@ internal sealed class Strings
         StatusExtractingFFmpeg = "Rozpakowywanie FFmpeg...",
         StatusFFmpegDownloaded = version => "FFmpeg pobrane. Wersja: " + version,
         StatusAllComponentsReady = "Wszystkie komponenty są dostępne. Gotowy do pobierania.",
+        StatusComponentsUnavailable = "Komponenty są niedostępne lub uszkodzone. Pobieranie jest wyłączone; użyj aktualizacji komponentów, aby ponowić instalację.",
         StatusDenoSkipped = "Deno: pomijanie (używany runtime systemowy)",
         StatusCheckingDenoVersion = "Sprawdzanie wersji Deno...",
         StatusDenoUpdateAvailable = "Deno: dostępna nowa wersja",
@@ -180,6 +187,7 @@ internal sealed class Strings
         StatusUpdatingYtDlp = "Aktualizacja yt-dlp...",
         StatusYtDlpUpdated = "yt-dlp zaktualizowane",
         StatusComponentsUpdateDone = "Aktualizacja zakończona",
+        StatusComponentsUpdateFailed = "Aktualizacja zakończona z błędami.",
         StatusUrlEmpty = "Błąd: URL nie może być pusty",
         StatusYouTubeOnly = "Błąd: tylko linki YouTube",
         StatusInvalidUrl = "Błąd: nieprawidłowy URL",
@@ -188,6 +196,8 @@ internal sealed class Strings
         StatusDownloadError = "Błąd pobierania",
         StatusFailed = "Błąd",
         StatusDownloadFinished = "Pobieranie zakończone!",
+        StatusCancelling = "Anulowanie pobierania...",
+        StatusDownloadCancelled = (completed, total) => $"Anulowano pobieranie. Pobrano {completed} z {total} plików.",
         StatusFinishedCount = (downloaded, total) => $"Zakończono: pobrano {downloaded}/{total}",
         StatusDownloadingAppUpdate = build => $"Pobieranie nowej wersji aplikacji (build {build})...",
         StatusInstallingAppUpdate = "Instalowanie nowej wersji aplikacji...",
@@ -267,6 +277,7 @@ internal sealed class Strings
         LabelQuality = "Quality:",
         LabelFormat = "Format:",
         ButtonDownload = "Download",
+        ButtonCancelDownload = "Cancel",
         PlaceholderExtraUrl = "Paste another video link...",
         ContentTypeVideoAudio = "Video + Audio",
         ContentTypeAudioOnly = "Audio only (MP3)",
@@ -289,6 +300,7 @@ internal sealed class Strings
         StatusExtractingFFmpeg = "Extracting FFmpeg...",
         StatusFFmpegDownloaded = version => "FFmpeg downloaded. Version: " + version,
         StatusAllComponentsReady = "All components are available. Ready to download.",
+        StatusComponentsUnavailable = "Components are missing or damaged. Downloading is disabled; update components to retry installation.",
         StatusDenoSkipped = "Deno: skipped (a system runtime is in use)",
         StatusCheckingDenoVersion = "Checking the Deno version...",
         StatusDenoUpdateAvailable = "Deno: new version available",
@@ -298,6 +310,7 @@ internal sealed class Strings
         StatusUpdatingYtDlp = "Updating yt-dlp...",
         StatusYtDlpUpdated = "yt-dlp updated",
         StatusComponentsUpdateDone = "Update finished",
+        StatusComponentsUpdateFailed = "Update finished with errors.",
         StatusUrlEmpty = "Error: the URL cannot be empty",
         StatusYouTubeOnly = "Error: YouTube links only",
         StatusInvalidUrl = "Error: invalid URL",
@@ -306,6 +319,8 @@ internal sealed class Strings
         StatusDownloadError = "Download error",
         StatusFailed = "Error",
         StatusDownloadFinished = "Download finished!",
+        StatusCancelling = "Cancelling download...",
+        StatusDownloadCancelled = (completed, total) => $"Download cancelled. Downloaded {completed} of {total} files.",
         StatusFinishedCount = (downloaded, total) => $"Finished: {downloaded}/{total} downloaded",
         StatusDownloadingAppUpdate = build => $"Downloading the new app version (build {build})...",
         StatusInstallingAppUpdate = "Installing the new app version...",

@@ -86,15 +86,16 @@ open -n --env "YTD_GITHUB_TOKEN=${YTD_GITHUB_TOKEN:-}" --stdout "$T/app.log" --s
 wait_for_app || fail "the app did not start"
 tools=0
 for _ in $(seq 1 36); do
-    if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffprobe" ]; then
+    if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffprobe" ] &&
+       grep -Eq '\[status\] (All components are available|Wszystkie komponenty są dostępne)' "$T/app.log"; then
         tools=1
         break
     fi
     pgrep -f "$APP_EXE" >/dev/null || fail "the app stopped"
     sleep 5
 done
-[ "$tools" = 1 ] || fail "yt-dlp/ffmpeg/ffprobe not in $DATA_DIR after 180 s"
-echo "tools downloaded to $DATA_DIR"
+[ "$tools" = 1 ] || fail "the app did not verify its components in $DATA_DIR after 180 s"
+echo "the app verified all components in $DATA_DIR"
 stop_app
 [ -z "$(find "$APP" -name downloads)" ] || fail "the app created downloads/ inside the bundle"
 codesign --verify --deep --strict "$APP" || fail "the app wrote into its own bundle"

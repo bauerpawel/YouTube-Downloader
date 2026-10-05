@@ -19,12 +19,18 @@
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="12.1.2" />
     <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.2" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.2" />
   </ItemGroup>
 
   <ItemGroup>
     <AvaloniaResource Include="app.ico" />
     <AvaloniaResource Include="Assets\app-logo.png" />
+    <AvaloniaResource Include="Assets/Fonts/DejaVuSansMono.ttf" />
+    <EmbeddedResource Include="Assets/Fonts/LICENSE.txt" />
+    <None Update="Assets/Fonts/LICENSE.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Compile Remove="tests/**/*.cs" />
+    <InternalsVisibleTo Include="YouTubeDownloader.Tests" />
   </ItemGroup>
 
   <!-- CI passes -p:BuildNumber=<github.run_number>; the self-updater compares it

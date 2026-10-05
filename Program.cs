@@ -1,4 +1,5 @@
 using Avalonia;
+using Avalonia.Media;
 
 namespace YouTubeDownloader;
 
@@ -11,5 +12,7 @@ internal static class Program
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UsePlatformDetect()
+            .With(new FontManagerOptions { DefaultFamilyName = "fonts:Inter#Inter" })
+            .WithInterFont()
             .LogToTrace();
 }

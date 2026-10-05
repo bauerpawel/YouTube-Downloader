@@ -29,6 +29,8 @@ defaults:
 
 jobs:
   build:
+    permissions:
+      contents: read
     strategy:
       matrix:
         configuration: [Debug, Release]
@@ -41,6 +43,7 @@ jobs:
       uses: actions/checkout@v7
       with:
         fetch-depth: 0
+        persist-credentials: false
 
     # Install the .NET 10 workload
     - name: Install .NET 10
@@ -56,13 +59,46 @@ jobs:
     - name: Build
       run: dotnet build $env:Solution_Name -c ${{ matrix.configuration }} --no-restore
 
-    # Execute all unit tests in the solution
+    # URL, component, format and cancellation regressions must pass before publishing.
     - name: Execute unit tests
-      run: dotnet test $env:Solution_Name -c ${{ matrix.configuration }} --no-build --verbosity normal
-      continue-on-error: true  # Continue if no tests exist
+      run: dotnet test tests/YouTubeDownloader.Tests/YouTubeDownloader.Tests.csproj -c ${{ matrix.configuration }} --verbosity normal --logger "trx;LogFileName=tests.trx" --results-directory ./TestResults
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v7
+      with:
+        name: tests-${{ matrix.os }}-${{ matrix.configuration }}
+        path: TestResults/*.trx
+
+  media-tests:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+    - uses: actions/setup-python@v6
+      with:
+        python-version: '3.12'
+    - name: Install media test tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ffmpeg
+        python -m pip install yt-dlp==2026.08.19
+    - name: Build format argument helper
+      run: dotnet build tests/YouTubeDownloader.Tests/YouTubeDownloader.Tests.csproj -c Release
+    - name: Test format selection and conversion with local media
+      run: python tests/media_smoke.py --argument-helper tests/YouTubeDownloader.Tests/bin/Release/net10.0/YouTubeDownloader.Tests.dll
 
   publish:
-    needs: build
+    needs: [build, media-tests]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # not on forked PRs
 
     strategy:
@@ -194,6 +230,18 @@ jobs:
         sudo apt-get install -y xvfb libx11-6 libice6 libsm6 fontconfig fonts-dejavu-core
         SMOKE="$RUNNER_TEMP/smoke"
         mkdir -p "$SMOKE"
+        # Exercise embedded Inter and DejaVu Sans Mono without system fonts.
+        mkdir -p "$SMOKE/empty-fonts" "$SMOKE/font-cache"
+        export FONTCONFIG_FILE="$SMOKE/fonts.conf"
+        cat > "$FONTCONFIG_FILE" <<EOF
+        <?xml version="1.0"?>
+        <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+        <fontconfig>
+          <dir>$SMOKE/empty-fonts</dir>
+          <cachedir>$SMOKE/font-cache</cachedir>
+        </fontconfig>
+        EOF
+        test -z "$(fc-list)"
         DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/YouTubeDownloader"
         cp ./publish/${{ matrix.rid }}/${{ matrix.exeName }} "$SMOKE/"
         chmod +x "$SMOKE/${{ matrix.exeName }}"
@@ -204,7 +252,8 @@ jobs:
         for i in $(seq 1 36); do
           sleep 5
           kill -0 $APP_PID 2>/dev/null || break
-          if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ]; then break; fi
+          if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffprobe" ] &&
+             grep -Eq '\[status\] (All components are available|Wszystkie komponenty są dostępne)' "$SMOKE/app.log"; then break; fi
         done
         if kill -0 $APP_PID 2>/dev/null; then
           echo "App is running (PID $APP_PID) after $((i * 5))s"
@@ -213,10 +262,11 @@ jobs:
           cat "$SMOKE/app.log"
           exit 1
         fi
-        if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ ! -e "$SMOKE/yt-dlp" ]; then
-          echo "yt-dlp and ffmpeg were downloaded to $DATA_DIR and are executable - Linux dependency logic verified"
+        if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffprobe" ] && [ ! -e "$SMOKE/yt-dlp" ] &&
+           grep -Eq '\[status\] (All components are available|Wszystkie komponenty są dostępne)' "$SMOKE/app.log"; then
+          echo "The app verified all components in $DATA_DIR - Linux dependency logic verified"
         else
-          echo "App is running, but yt-dlp/ffmpeg are not in $DATA_DIR (or were written next to the exe)"
+          echo "The app did not verify its components in $DATA_DIR (or wrote tools next to the exe)"
           ls -la "$SMOKE" "$DATA_DIR" "$DATA_DIR/ffmpeg_bin" 2>&1
           cat "$SMOKE/app.log"
           pkill -f "$SMOKE/${{ matrix.exeName }}" || true
@@ -263,7 +313,8 @@ jobs:
         for i in $(seq 1 36); do
           sleep 5
           kill -0 $APP_PID 2>/dev/null || break
-          if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffprobe" ]; then break; fi
+          if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffprobe" ] &&
+             grep -Eq '\[status\] (All components are available|Wszystkie komponenty są dostępne)' "$SMOKE/app.log"; then break; fi
         done
         if kill -0 $APP_PID 2>/dev/null; then
           echo "App is running (PID $APP_PID) after $((i * 5))s"
@@ -272,10 +323,11 @@ jobs:
           cat "$SMOKE/app.log"
           exit 1
         fi
-        if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffprobe" ] && [ ! -e "$SMOKE/yt-dlp" ]; then
-          echo "yt-dlp and ffmpeg/ffprobe were downloaded to $DATA_DIR and are executable - macOS dependency logic verified"
+        if [ -x "$DATA_DIR/yt-dlp" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffmpeg" ] && [ -x "$DATA_DIR/ffmpeg_bin/ffprobe" ] && [ ! -e "$SMOKE/yt-dlp" ] &&
+           grep -Eq '\[status\] (All components are available|Wszystkie komponenty są dostępne)' "$SMOKE/app.log"; then
+          echo "The app verified all components in $DATA_DIR - macOS dependency logic verified"
         else
-          echo "App is running, but yt-dlp/ffmpeg are not in $DATA_DIR (or were written next to the exe)"
+          echo "The app did not verify its components in $DATA_DIR (or wrote tools next to the exe)"
           ls -la "$SMOKE" "$DATA_DIR" "$DATA_DIR/ffmpeg_bin" 2>&1
           cat "$SMOKE/app.log"
           pkill -f "$SMOKE/${{ matrix.exeName }}" || true
@@ -480,13 +532,14 @@ jobs:
             echo "The snap app exited or crashed"
             break
           fi
-          if [ -x "$COMMON/yt-dlp" ] && [ -x "$COMMON/ffmpeg_bin/ffmpeg" ]; then
+          if [ -x "$COMMON/yt-dlp" ] && [ -x "$COMMON/ffmpeg_bin/ffmpeg" ] && [ -x "$COMMON/ffmpeg_bin/ffprobe" ] &&
+             grep -Eq '\[status\] (All components are available|Wszystkie komponenty są dostępne)' "$LOG"; then
             ok=1
             break
           fi
         done
         if [ "$ok" = 1 ]; then
-          echo "yt-dlp and ffmpeg were downloaded to $COMMON and are executable"
+          echo "The app verified all components in $COMMON"
           # A real download runs these tools inside the app's confinement (yt-dlp
           # is a PyInstaller onefile that unpacks into the snap's private /tmp),
           # reads user-dirs.dirs through the desktop interface and writes the
@@ -512,7 +565,7 @@ jobs:
             ok=0
           fi
         else
-          echo "Tools not in $COMMON after 120 s (or the app stopped)"
+          echo "The app did not verify its components in $COMMON after 120 s (or stopped)"
         fi
         if [ "$ok" != 1 ]; then
           ls -la "$COMMON" "$COMMON/ffmpeg_bin" 2>&1 || true

@@ -139,16 +139,15 @@ Named elements (`Name`) become strongly-typed, non-nullable code-behind fields a
 All three dependency downloaders are OS-conditional (checked via `OperatingSystem.IsWindows()` and, on non-Windows, `RuntimeInformation.ProcessArchitecture` to distinguish x64 vs ARM64). Windows behavior is unchanged from the original WinForms/single-OS app; Linux (x64 + ARM64) and macOS (x64 + ARM64) are parallel code paths added alongside it, not a replacement.
 
 **CheckAndDownloadComponents()**
-- Checks for Deno/Node.js runtime availability (`IsRuntimeInPath()`)
-- Downloads yt-dlp if missing, FFmpeg if missing
+- Checks Deno/Node.js, yt-dlp, FFmpeg and ffprobe by running their version commands
+- Repairs missing or unusable tools and enables downloading only after every required check passes
 - All operations are async and report progress via `UpdateStatus()`
 
-**IsRuntimeInPath() / GetRuntimePath() / CheckAndUpdateDeno()'s "system runtime" check - three distinct mechanisms, not one**
+**GetRuntimePathAsync() / CheckAndUpdateDeno()'s external runtime check**
 - `FindSystemDeno()` shells out to `where deno` (Windows) / `which deno` (Linux/macOS) and returns the first hit that **exists and lies outside the app folder** (`AppPaths.PickFirstPathOutside()`): `where` searches the current directory first, which for a double-clicked app is the app folder - an old `deno.exe` left there by a pre-2.0.280926 version must not count as system-wide. A GUI app also receives `where` output in the OEM code page decoded as ANSI, so a non-ASCII path (`C:\Users\Michał\Downloads`) comes back mangled and would no longer match the app folder - the `File.Exists` check drops such lines. `where` also prints every match on its own line, so the raw output is never used as a path
-- `IsRuntimeInPath()` (called from `CheckAndDownloadComponents()` to decide whether Deno must be auto-downloaded) is `FindSystemDeno() != ""`
-- `GetRuntimePath()` (used to build the yt-dlp `--js-runtimes` invocation) returns the data-folder `denoPath`, then `nodeJsPath` (data folder first, then app folder), then `FindSystemDeno()`
+- `GetRuntimePathAsync()` checks the data-folder Deno, Node (data folder first, then app folder), and system Deno in that order, returning the first usable runtime. A successful version command is required; file existence alone is insufficient
 - `YtDlpArguments.JsRuntime()` always passes that runtime **with its path** (`--js-runtimes "deno:<path>"` / `"node:<path>"`): outside Windows yt-dlp looks for `deno`/`node` only on `PATH` (on Windows also next to `yt-dlp.exe`), and the data folder is not on `PATH`. Without the path yt-dlp reported `JS runtimes: none` on Linux, macOS and in the snap (versions 2.0.280926-2.0.300926 build 28)
-- `CheckAndUpdateDeno()` (used by the "Update Components" menu action) does **not** shell out at all: it only checks `File.Exists(denoPath)` as a local proxy - if the app's own managed `deno` binary isn't present, it assumes a system/external runtime is in use and skips the version-check/update entirely
+- `CheckAndUpdateDeno()` skips the managed Deno update only when its binary is absent and another runtime passes its version check
 
 **GetDenoAssetName() / DownloadDeno() / GetLatestDenoInfo()**
 - Queries the GitHub API for the latest Deno release, picks the matching asset by name via `GetDenoAssetName()`:
@@ -176,10 +175,10 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - After copying each file from the extracted `bin/` into `ffmpeg_bin/`, calls `MakeExecutable()` on it
 - Stores version information in `ffmpeg_version.txt` for update checks
 
-**GetFFmpegMacAssetName() / GetLatestFFmpegInfoMac() / DownloadFFmpegMac()**
+**GetFFmpegMacAssetName() / GetLatestFFmpegInfoMac() / DownloadFFmpeg() on macOS**
 - macOS FFmpeg comes from a different upstream entirely: `eugeneware/ffmpeg-static` (BtbN/FFmpeg-Builds does not publish macOS binaries)
 - `GetFFmpegMacAssetName()` matches assets by **exact name equality**, not substring/suffix matching: `ffmpeg-darwin-x64`/`ffmpeg-darwin-arm64` and `ffprobe-darwin-x64`/`ffprobe-darwin-arm64`. Exact equality is required specifically because the real `eugeneware/ffmpeg-static` release also publishes `.gz`/`.LICENSE`/`.README` sidecar assets whose names contain the target asset name as a substring - a substring/suffix check would false-match those
-- The two matched assets are raw executable binaries, not an archive - nothing is extracted; they're downloaded directly to `ffmpeg_bin/ffmpeg` and `ffmpeg_bin/ffprobe` and marked executable via the existing `MakeExecutable()` helper
+- The two matched assets are raw executable binaries, not an archive. Both are downloaded into a staging folder, marked executable and verified before the complete `ffmpeg_bin/` folder is replaced
 - `DownloadFFmpeg()` and `CheckAndUpdateFFmpeg()` both branch to this path via `OperatingSystem.IsMacOS()` before reaching any BtbN-specific code
 
 **AppPaths.MakeExecutable()**
@@ -187,24 +186,27 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - Moved out of `MainWindow` so `AppUpdater` can use it too
 
 **DownloadFileWithProgress()**
-- Shared helper: streams an HTTP download to disk while reporting progress on `ProgressBarDownload`
+- Shared helper: uses `AtomicDownload` to stream to a temporary file, validate length and any published hash, and promote the complete file while reporting progress on `ProgressBarDownload`
 
 #### 4. Download Operations (`MainWindow.axaml.cs`)
 **BtnDownload_Click()**
 - Main download handler, wired to `BtnDownload.Click` in the constructor
 - Validates every URL (see URL Handling) and dependency availability up front
-- Iterates all URLs via `DownloadSingleUrlAsync()`, tracking a success count for multi-URL runs
+- Runs URLs serially through `DownloadBatch` and `DownloadSingleUrlAsync()`, tracking completed files
 - Reports an aggregate success/failure summary via `MessageDialog` when finished
+- A per-batch cancellation token reaches both readiness checks and yt-dlp. `BtnCancelDownload` cancels the active process tree and prevents the next URL from starting; cancellation gets its own status without a success/error dialog
+- Download settings are locked during the batch and restored in `finally`. Completed files and yt-dlp partial files are retained. Closing the window during downloading cancels and awaits the batch before closing
 
 **DownloadSingleUrlAsync()**
 - Builds the yt-dlp command line for one URL and executes yt-dlp as an external process
 - Parses real-time progress from stdout, handles errors and updates the UI
 
-**BuildYtDlpArguments()**
+**YtDlpArguments.Build() / BuildYtDlpStartInfo()**
 - Constructs yt-dlp CLI arguments based on user selections
 - Audio-only mode: `-f bestaudio --extract-audio --audio-format mp3 --audio-quality 192`
-- Video modes: selects best video+audio combination with height constraints
-- Format remuxing: `--remux-video` or `--merge-output-format`
+- Video modes: selects video+audio with height constraints on both separate video and combined-stream fallback
+- MP4 selects MP4 video and M4A audio; WebM selects WebM video/audio so H.264/AAC cannot be remuxed into WebM. MKV accepts streams from either container
+- Both `--merge-output-format` and `--remux-video` ensure the chosen output container, including a single combined stream. Missing compatible formats are reported by yt-dlp; there is no automatic lossy video transcoding
 
 **ParseDownloadProgress()**
 - Parses yt-dlp output lines containing `[download]`
@@ -225,18 +227,18 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 **AktualizujKomponenty_Click()**
 - Menu handler for "Aktualizuj komponenty", wired to `MiAktualizujKomponenty.Click`
 - Prompts for confirmation via `MessageDialog.ShowConfirmAsync()`
-- Updates yt-dlp using self-update: `yt-dlp.exe -U`
+- Updates yt-dlp from GitHub release metadata through a verified staging file, preserving the installed binary on failure
 - Delegates to `CheckAndUpdateDeno()` and `CheckAndUpdateFFmpeg()`
-- Disables the download button during updates
+- Disables downloading during updates and reports success only when every update succeeds and all required tools pass their version checks
 
 **CheckAndUpdateDeno()**
 - Compares the locally recorded Deno version (`deno_version.txt`) against the latest GitHub release
-- Skips the check entirely when Deno isn't installed locally (a system-wide Deno/Node runtime is being used instead)
-- Re-downloads Deno if a newer version is available
+- Skips the update when managed Deno is absent and an external runtime is usable
+- Re-downloads Deno if the version differs or the installed executable fails its version check; binary and version marker are committed together
 
 **CheckAndUpdateFFmpeg()**
 - Compares local version with latest GitHub release
-- Downloads and reinstalls if version mismatch, preserves the version tracking file
+- Stages and verifies FFmpeg and ffprobe if the version differs or either installed executable is unusable. API errors leave the existing installation untouched; commit errors restore the previous directory and version marker
 
 **CheckForAppUpdate(bool silent) / InstallAppUpdate()** (app self-update, logic in `AppUpdater.cs`)
 - Runs silently at the end of `CheckAndDownloadComponents()` and loudly from `MiSprawdzAktualizacje`. Silent mode never shows errors (offline, GitHub API rate limit)
@@ -252,7 +254,7 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 ")` since a Windows checkout gives the literal CRLF. App Management (macOS 13+) protects only notarized apps, so it does not block this ad-hoc signed one
 - `AppUpdater.CleanupLeftovers()` removes `<exe>.new`, `<exe>.old` (left on Windows by the older in-process updater) and the macOS update zip/folder on every start; `CleanupBundleLeftovers()` removes `<bundle>.old` and the data-folder update zip/folder
 - The exe file name is never assumed
-- `SetBusy(true)` disables `BtnDownload`, `MiSprawdzAktualizacje` and `MiAktualizujKomponenty` for the whole of `CheckAndDownloadComponents()` (startup tool downloads), `AktualizujKomponenty_Click()`, video downloads and the self-update itself - so an update's final shutdown can never cut a component download short. The startup check runs after `SetBusy(false)` and skips itself whenever `BtnDownload` is disabled
+- `SetBusy(true)` disables `BtnDownload`, `MiSprawdzAktualizacje` and `MiAktualizujKomponenty` during startup tool downloads, component updates, video downloads and app installation. The app-update check runs after `SetBusy(false)` and skips itself while `isBusy` is true. Downloading also requires verified component readiness
 
 #### 7. About & Message Dialogs
 **AboutWindow** (`AboutWindow.axaml` / `.axaml.cs`)
@@ -316,6 +318,55 @@ CI (`.github/workflows/dotnet-desktop.yml`) builds and publishes all six RIDs - 
 **Snap Store (`snap` job).** After `publish`, a two-leg job (`amd64` on `ubuntu-latest`, `arm64` on `ubuntu-24.04-arm`) packs the `YouTubeDownloader-linux-x64`/`-linux-arm64` artifacts with `snap/snapcraft.yaml` (`dump` plugin over the single-file binary, `core24`, strict confinement, `gnome` extension, plugs `home` + `network`, plus `removable-media` that the user connects by hand for a Downloads folder on another drive; version `<Version>-<run_number>` via `snap-bin/version.txt`), installs the result with `snap install --dangerous`, checks that `home` and `network` are connected, runs it under `Xvfb :99 -ac` (a snap cannot read `xvfb-run`'s Xauthority in `/tmp`) and waits up to 120 s for `yt-dlp` and `ffmpeg_bin/ffmpeg` in `~/snap/yt-downloader-bp/common`. It then runs `yt-dlp`, `deno`, `ffmpeg` and `ffprobe` inside the app's confinement (`snap run --shell yt-downloader-bp`, without the GitHub token), reads a test `~/.config/user-dirs.dirs` (desktop interface) and writes `~/Pobrane/YouTube Downloader` (home interface), and only then releases it to `stable` with `snapcore/action-publish`. The job runs with a read-only token (`permissions: contents: read`, checkout with `persist-credentials: false`), because the smoke test runs third-party binaries next to the workspace. The workflow has `concurrency: release-<ref>` (one run per ref at a time, never cancelled midway), so two quick pushes reach `stable` in push order. On failure the smoke test prints the kernel's AppArmor/seccomp denials (`apparmor="DENIED"`, `type=1326` with the syscall number). The Store login is the repository secret `SNAPCRAFT_STORE_CREDENTIALS`; only the publish step sees it - the job env carries just `HAS_SNAP_CREDENTIALS`, because the smoke test runs yt-dlp and Deno downloaded from the internet. Without the secret the snap is still built and tested and a warning replaces the publish. The credentials expire (by default after a year): renew them on any Linux with `snapcraft export-login --snaps=yt-downloader-bp --acls=package_access,package_push,package_update,package_release creds.txt` and replace the secret. `workflow_dispatch` from a feature branch would also push a snap to `stable`. Inside the snap: data in `$SNAP_USER_COMMON`, self-update off (`AppPaths.IsSnap`), downloads in `AppPaths.DownloadsDirectory`. **`tar` inside the snap is `bsdtar`** (`libarchive-tools`, organized to `$SNAP/usr/bin/tar`, first in the snap's `PATH`): `core24`'s GNU tar 1.35 extracts through `openat2`, which snapd's seccomp profile denies outright (`~openat2`, `EPERM`, no fallback - FFmpeg's `.tar.xz` failed with "Cannot mkdir: Operation not permitted"), and `core24` has no `xz` either; bsdtar (libarchive 3.7) uses no `openat2` and reads xz itself. Anything new the app shells out to must be checked against that profile the same way.
 
 ### Testing Changes
+
+Component installation and updates use `AtomicDownload` and `ComponentInstaller`.
+Downloads go to unique `.part-*` files; length and any published SHA-256 digest
+are checked before promotion. Deno, yt-dlp and the complete FFmpeg/ffprobe folder
+are staged and checked by running version commands before the installed files are
+replaced. Version markers are part of the same commit; a commit failure restores
+the previous files, retaining backups if recovery itself fails. An API lookup
+failure must not delete an installation or become an empty "new version".
+`ComponentHealth` validates all required tools at startup and before downloading;
+file/directory existence alone is insufficient. Download stays disabled until
+these checks pass. Component-update failures are reported even when preserved
+old components still work. Regression tests cover interrupted transfers, hashes,
+failed extraction/probes, file/directory rollback and unsuccessful process exit codes.
+CI smoke tests also require the application's verified readiness status, including
+the JavaScript runtime and ffprobe, instead of passing on file existence alone.
+
+The application embeds its fonts: `Avalonia.Fonts.Inter` is registered by
+`WithInterFont()` in `Program.BuildAvaloniaApp()`, and the status TextBlock uses
+`Assets/Fonts/DejaVuSansMono.ttf` through its `avares://` URI. Keep the font license
+in `Assets/Fonts/LICENSE.txt` with the font; it is embedded for single-file releases
+and copied to published output. Do not replace
+these with system-only font names: missing Inter or Courier New previously crashed
+startup on Linux. `FontManagerOptions.DefaultFamilyName` explicitly selects the
+embedded Inter family so startup also works with no system fonts. After changing
+font configuration, launch the actual application
+(under Xvfb on a headless Linux host) and check rendering and startup status.
+The Linux CI smoke test uses an empty Fontconfig configuration so system fonts
+cannot hide missing embedded fonts or registration.
+
+Run the URL, component, process and download-batch regression tests with
+`dotnet test tests/YouTubeDownloader.Tests/YouTubeDownloader.Tests.csproj`.
+They include a harmless child process that verifies argument boundaries on each
+OS. Process tests cover large stdout/stderr, pre-cancellation and stopping child
+processes; batch tests verify completed counts and that cancelled queues do not
+start another URL. CI runs these for Debug and Release on Windows, Linux and
+macOS, uploads TRX results, and blocks publication on failure.
+`YouTubeUrl.TryNormalize()` checks the parsed hostname (youtube.com and its
+subdomains, or youtu.be), rejects malformed input and returns a canonical URL.
+All download arguments are passed separately through `ProcessStartInfo.ArgumentList`;
+do not concatenate or manually quote user input in `Arguments`.
+These tests do not exercise GUI interaction or real YouTube downloads.
+
+`tests/media_smoke.py` additionally exercises the actual application format
+arguments with yt-dlp and FFmpeg, serving short generated clips and extractor
+metadata on loopback. It checks WebM codec compatibility, height limits, MP4/MKV,
+single-stream MKV remuxing, MP3 extraction and unavailable WebM streams. The
+`media-tests` CI job must pass before publishing and needs no YouTube access.
+See `tests/README.md` for tool requirements and commands. GUI interaction and
+real YouTube downloads still require separate validation.
 
 1. **UI Changes**: Modify the relevant `.axaml` file (`MainWindow.axaml`, `AboutWindow.axaml`, or `MessageDialog.axaml`)
 2. **Business Logic**: Update the relevant method in `MainWindow.axaml.cs` (dependency management, download orchestration, URL handling, or update mechanism)
@@ -391,19 +442,19 @@ The application passes specific arguments based on user selections:
 
 **Video (Best quality)**:
 ```
--f bestvideo+bestaudio/best --remux-video mp4
+-f bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4] --merge-output-format mp4 --remux-video mp4
 ```
 
 **Video (Specific resolution)**:
 ```
--f bestvideo[height<=1080]+bestaudio/best[height<=1080] --remux-video mp4
+-f bestvideo[ext=mp4][height<=1080]+bestaudio[ext=m4a]/best[ext=mp4][height<=1080] --merge-output-format mp4 --remux-video mp4
 ```
 
 Common arguments:
 - `--ffmpeg-location "path/to/ffmpeg_bin"` - FFmpeg location
 - `--progress --newline` - Progress reporting
 - `-o "<AppPaths.DownloadsDirectory>/%(title)s.%(ext)s"` - Output pattern
-- `--js-runtimes "deno:<path>"` (or `"node:<path>"`) - The JS runtime from `GetRuntimePath()`, always with its path (`YtDlpArguments.JsRuntime()`)
+- `--js-runtimes "deno:<path>"` (or `"node:<path>"`) - The JS runtime from `GetRuntimePathAsync()`, always with its path (`YtDlpArguments.JsRuntime()`)
 
 ### Progress Parsing
 The application parses yt-dlp output using regex patterns:

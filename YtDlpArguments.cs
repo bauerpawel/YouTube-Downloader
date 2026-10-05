@@ -1,3 +1,5 @@
+using System.Diagnostics;
+
 namespace YouTubeDownloader;
 
 // yt-dlp format arguments from language-independent values. The quality list used
@@ -23,24 +25,54 @@ internal static class YtDlpArguments
     {
         string name = Path.GetFileNameWithoutExtension(runtimePath)
             .Equals("deno", StringComparison.OrdinalIgnoreCase) ? "deno" : "node";
-        return $"--js-runtimes \"{name}:{runtimePath}\"";
+        return $"{name}:{runtimePath}";
     }
 
-    public static string Build(bool audioOnly, int? maxHeight, string format)
+    public static IReadOnlyList<string> Build(bool audioOnly, int? maxHeight, string format)
     {
         if (audioOnly)
-            return " -f bestaudio --extract-audio --audio-format mp3 --audio-quality 192";
+            return new[] { "-f", "bestaudio", "--extract-audio", "--audio-format", "mp3", "--audio-quality", "192" };
 
-        string args = maxHeight == null
-            ? " -f bestvideo+bestaudio/best"
-            : $" -f bestvideo[height<={maxHeight}]+bestaudio/best[height<={maxHeight}]";
-
-        return args + format switch
+        // Select streams that fit the requested container. Remuxing only changes
+        // the container; it cannot turn H.264/AAC into WebM-compatible codecs.
+        var (video, audio, combined) = format switch
         {
-            "mp4" => " --remux-video mp4",
-            "webm" => " --remux-video webm",
-            "mkv" => " --merge-output-format mkv",
-            _ => ""
+            "webm" => ("bestvideo[ext=webm]", "bestaudio[ext=webm]", "best[ext=webm]"),
+            "mp4" => ("bestvideo[ext=mp4]", "bestaudio[ext=m4a]", "best[ext=mp4]"),
+            "mkv" => ("bestvideo", "bestaudio", "best"),
+            _ => throw new ArgumentException("Unsupported video format.", nameof(format))
         };
+        string height = maxHeight.HasValue ? $"[height<={maxHeight.Value}]" : "";
+        return new[]
+        {
+            "-f", $"{video}{height}+{audio}/{combined}{height}",
+            "--merge-output-format", format, "--remux-video", format
+        };
+    }
+
+    public static ProcessStartInfo CreateStartInfo(string executablePath, string runtimePath,
+        string ffmpegDirectory, string outputPattern, string normalizedUrl,
+        bool audioOnly, int? maxHeight, string format)
+    {
+        var startInfo = new ProcessStartInfo(executablePath)
+        {
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+
+        startInfo.ArgumentList.Add("--js-runtimes");
+        startInfo.ArgumentList.Add(JsRuntime(runtimePath));
+        foreach (string argument in Build(audioOnly, maxHeight, format))
+            startInfo.ArgumentList.Add(argument);
+
+        startInfo.ArgumentList.Add("--ffmpeg-location");
+        startInfo.ArgumentList.Add(ffmpegDirectory);
+        startInfo.ArgumentList.Add("--progress");
+        startInfo.ArgumentList.Add("--newline");
+        startInfo.ArgumentList.Add("-o");
+        startInfo.ArgumentList.Add(outputPattern);
+        startInfo.ArgumentList.Add("--");
+        startInfo.ArgumentList.Add(normalizedUrl);
+        return startInfo;
     }
 }
