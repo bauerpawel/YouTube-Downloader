@@ -38,10 +38,13 @@ internal static class ComponentHealth
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         cancellation.CancelAfter(timeout ?? TimeSpan.FromSeconds(15));
         bool recognized = false;
+        string output = "";
         try
         {
-            var (code, _) = await ProcessRunner.RunAsync(command, line =>
+            var (code, error) = await ProcessRunner.RunAsync(command, line =>
             {
+                if (output.Length < 4096)
+                    output += line + Environment.NewLine;
                 recognized |= tool switch
                 {
                     ComponentTool.YtDlp => Regex.IsMatch(line, @"\A\d{4}\.\d{2}\.\d{2}(?:\D|$)"),
@@ -52,6 +55,9 @@ internal static class ComponentHealth
                     _ => false
                 };
             }, cancellation.Token);
+            if (code != 0 || !recognized)
+                Console.WriteLine($"[component] {tool}: version check failed (exit {code}). " +
+                    $"stdout: {output.Trim()} stderr: {error[..Math.Min(error.Length, 4096)].Trim()}");
             return code == 0 && recognized;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -61,6 +67,7 @@ internal static class ComponentHealth
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or
             UnauthorizedAccessException or InvalidOperationException or OperationCanceledException)
         {
+            Console.WriteLine($"[component] {tool}: version check failed: {ex.Message}");
             return false;
         }
     }
