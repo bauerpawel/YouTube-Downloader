@@ -37,10 +37,10 @@ internal static class ComponentHealth
         TimeSpan? timeout = null, CancellationToken cancellationToken = default)
     {
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        // The first start of the large Deno x64 binary under Rosetta can exceed
-        // 15 seconds. Other tools keep the usual deadline; user cancellation
-        // still interrupts this longer check immediately.
-        var deadline = timeout ?? (tool == ComponentTool.Deno && OperatingSystem.IsMacOS() &&
+        // Initial tool startup under Rosetta can exceed 15 seconds (including
+        // Deno and yt-dlp). Keep checks bounded without rejecting those valid
+        // binaries. User cancellation still interrupts the check immediately.
+        var deadline = timeout ?? (OperatingSystem.IsMacOS() &&
             RuntimeInformation.ProcessArchitecture == Architecture.X64
                 ? TimeSpan.FromSeconds(90) : TimeSpan.FromSeconds(15));
         cancellation.CancelAfter(deadline);
@@ -76,7 +76,8 @@ internal static class ComponentHealth
         }
         catch (OperationCanceledException)
         {
-            Console.WriteLine($"[component] {tool}: version check timed out after {deadline.TotalSeconds} seconds.");
+            Console.WriteLine($"[component] {tool}: version check timed out after {deadline.TotalSeconds} seconds. " +
+                $"stdout: {output.Trim()}");
             return false;
         }
         catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException or
