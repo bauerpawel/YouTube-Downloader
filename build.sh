@@ -36,6 +36,18 @@ build_one() {
         -o "$output"
 }
 
+# AppImage of linux-<arch>: the single-file binary, packed by appimage/package.sh.
+build_appimage() {
+    local arch="$1"
+    local rid="linux-$arch"
+    local version
+
+    build_one "$rid"
+    version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$PROJECT")
+    bash "$(dirname "$0")/appimage/package.sh" \
+        "publish/$rid/YouTubeDownloader" "publish/appimage-$arch" "$rid" "$version"
+}
+
 RID="${1:-linux-x64}"
 
 if [ "$RID" = "all" ]; then
@@ -66,10 +78,31 @@ if [ "$RID" = "all" ]; then
     exit 0
 fi
 
+if [ "$RID" = "appimage-x64" ] || [ "$RID" = "appimage-arm64" ]; then
+    if [ "$(uname -s)" != "Linux" ]; then
+        echo "[BLAD] AppImage mozna zbudowac tylko na Linuksie (appimagetool)."
+        exit 1
+    fi
+
+    ARCH="${RID#appimage-}"
+    echo
+    echo "Przywracanie zaleznosci..."
+    dotnet restore "$PROJECT"
+
+    build_appimage "$ARCH"
+
+    echo
+    echo "============================================"
+    echo "  Gotowe! AppImage znajduje sie w:"
+    echo "  $(pwd)/publish/$RID/YouTubeDownloader-linux-$ARCH.AppImage"
+    echo "============================================"
+    exit 0
+fi
+
 case "$RID" in
     win-x64|win-arm64|linux-x64|linux-arm64|osx-x64|osx-arm64) ;;
     *)
-        echo "[BLAD] Nieznana architektura \"$RID\". Uzyj win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64 lub all."
+        echo "[BLAD] Nieznana architektura \"$RID\". Uzyj win-x64, win-arm64, linux-x64, linux-arm64, osx-x64, osx-arm64, appimage-x64, appimage-arm64 lub all."
         echo "Przyklad: ./build.sh all"
         exit 1
         ;;
