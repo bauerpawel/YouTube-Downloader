@@ -96,6 +96,28 @@ public class AppImagePathsTests
             AppPaths.ResolveDownloadsDirectory(true, false, false, appDir, realHome, null, home));
     }
 
+    // A fresh home may have no ~/.local/share yet (or XDG_DATA_HOME names a folder
+    // that does not exist). The data folder must still be created there: the
+    // fallback, the app folder, is a read-only mount in an AppImage, so no tool
+    // could be installed at all.
+    [Fact]
+    public async Task DataDirectoryIsCreatedWhenXdgDataHomeDoesNotExistYet()
+    {
+        if (!OperatingSystem.IsLinux())
+            return; // XDG_DATA_HOME is Linux-only; LocalApplicationData exists elsewhere
+
+        string dataHome = Path.Combine(NewTempDir(), "missing", "data");
+        var command = ChildProcess.Command("--data-directory");
+        command.Environment["XDG_DATA_HOME"] = dataHome;
+        command.Environment.Remove("SNAP");
+        var lines = new List<string>();
+        var (code, error) = await ProcessRunner.RunAsync(command, lines.Add);
+
+        Assert.True(code == 0, error);
+        Assert.Equal(Path.Combine(dataHome, AppPaths.DataFolderName), Assert.Single(lines));
+        Assert.True(Directory.Exists(Path.Combine(dataHome, AppPaths.DataFolderName)));
+    }
+
     private static void WriteUserDirs(string home)
     {
         Directory.CreateDirectory(Path.Combine(home, ".config"));
