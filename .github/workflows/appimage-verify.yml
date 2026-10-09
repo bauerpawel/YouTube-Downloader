@@ -56,15 +56,20 @@ jobs:
         export XDG_DATA_HOME="$RUNNER_TEMP/extract-data"
         ./startup-dist/YouTubeDownloader-${{ matrix.rid }}.AppImage --appimage-extract-and-run > "$RUNNER_TEMP/extract.log" 2>&1 &
         PID=$!
+        # Extract-and-run forks: the runtime ($PID) waits, the app is its child.
         appdir=""
-        for i in $(seq 1 30); do
-          appdir=$(tr '\0' '\n' < "/proc/$PID/environ" 2>/dev/null | sed -n 's/^APPDIR=//p')
-          [ -n "$appdir" ] && break
+        child=""
+        for i in $(seq 1 60); do
+          child=$(pgrep -P "$PID" | head -n 1 || true)
+          if [ -n "$child" ]; then
+            appdir=$(tr '\0' '\n' < "/proc/$child/environ" 2>/dev/null | sed -n 's/^APPDIR=//p')
+            [ -n "$appdir" ] && break
+          fi
           sleep 1
         done
-        echo "APPDIR=$appdir"
+        echo "app PID=$child APPDIR=$appdir exe=$(readlink "/proc/$child/exe" 2>/dev/null || true)"
         cat "$RUNNER_TEMP/extract.log"
-        kill "$PID" 2>/dev/null || true
+        kill "$child" "$PID" 2>/dev/null || true
         case "$(basename "$appdir")" in
           appimage_extracted_*) echo "extract-and-run APPDIR matches AppPaths.IsExtractAndRunDirectory" ;;
           *) echo "unexpected APPDIR '$appdir'"; exit 1 ;;
