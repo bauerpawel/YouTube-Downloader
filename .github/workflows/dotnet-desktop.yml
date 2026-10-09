@@ -129,8 +129,50 @@ jobs:
         YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: bash tests/macos_smoke.sh ./startup-publish
 
+  # Linux AppImage on both architectures natively: real FUSE mount, tool
+  # download and the self-update swap script - see appimage/smoke-test.sh.
+  # Read-only token, as in the snap job: the app runs the latest yt-dlp, Deno and
+  # FFmpeg, which inherit the environment. Runs on pull requests too.
+  linux-startup:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-latest
+          - rid: linux-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+    # Same flags as the publish job.
+    - name: Publish Linux test application
+      run: |
+        dotnet publish YouTubeDownloader.csproj -c Release -r ${{ matrix.rid }} --self-contained true \
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+          -p:EnableCompressionInSingleFile=true -o ./startup-publish
+    - name: Build AppImage
+      run: |
+        version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' YouTubeDownloader.csproj)
+        bash appimage/package.sh ./startup-publish/YouTubeDownloader ./startup-dist ${{ matrix.rid }} "$version-${{ github.run_number }}"
+    - name: Smoke-test AppImage
+      env:
+        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: bash appimage/smoke-test.sh ./startup-dist/YouTubeDownloader-${{ matrix.rid }}.AppImage
+
   publish:
-    needs: [build, media-tests, macos-startup]
+    needs: [build, media-tests, macos-startup, linux-startup]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # not on forked PRs
 
     strategy:
@@ -153,7 +195,7 @@ jobs:
             releaseExeName: YouTubeDownloader-linux-x64
             singleFile: true
           - rid: linux-arm64
-            os: ubuntu-24.04-arm
+            os: ubuntu-latest
             exeName: YouTubeDownloader
             releaseExeName: YouTubeDownloader-linux-arm64
             singleFile: true
@@ -243,13 +285,14 @@ jobs:
 
     # Headless smoke-test: the only real proof (in this whole project) that the
     # Linux dependency-download logic actually works, since local development
-    # happens on Windows. Both Linux legs run natively (linux-arm64 on
-    # ubuntu-24.04-arm). The app downloads its tools into the per-user data
-    # directory (~/.local/share/YouTubeDownloader), never next to the exe - the
-    # test asserts both. Runs against a copy in an isolated temp directory so
-    # nothing the app writes can end up in the release artifact.
-    - name: Smoke-test published binary (Linux)
-      if: runner.os == 'Linux'
+    # happens on Windows. linux-x64 only: ubuntu-latest is an x86-64 runner and
+    # cannot execute an aarch64 binary without QEMU/binfmt_misc registration,
+    # which this workflow does not set up. The app downloads its tools into the
+    # per-user data directory (~/.local/share/YouTubeDownloader), never next to
+    # the exe - the test asserts both. Runs against a copy in an isolated temp
+    # directory so nothing the app writes can end up in the release artifact.
+    - name: Smoke-test published binary (linux-x64 only)
+      if: matrix.rid == 'linux-x64'
       shell: bash
       # Authenticates the app's GitHub API calls (GitHubApi.cs). Anonymous calls
       # share a 60/hour limit per runner IP, and when it runs out the app stops at
@@ -310,20 +353,13 @@ jobs:
     # Linux AppImage: the single-file binary above in an AppDir with its .desktop
     # entry and icon, packed by a pinned appimagetool with the static type2
     # runtime (users need no libfuse2). Into ./dist, so the publish-folder zip
-    # below does not pick it up.
+    # below does not pick it up. Either host packs either architecture. The
+    # linux-startup job smoke-tests the same AppImage, built from the same commit,
+    # with a read-only token.
     - name: Build AppImage (Linux)
       if: runner.os == 'Linux'
       shell: bash
       run: bash appimage/package.sh ./publish/${{ matrix.rid }}/${{ matrix.exeName }} ./dist/${{ matrix.rid }} ${{ matrix.rid }} ${{ steps.get_version.outputs.version }}-${{ github.run_number }}
-
-    # Runs the AppImage through a real FUSE mount, waits for the tools and runs
-    # the self-update swap script verbatim - see appimage/smoke-test.sh.
-    - name: Smoke-test AppImage (Linux)
-      if: runner.os == 'Linux'
-      shell: bash
-      env:
-        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: bash appimage/smoke-test.sh ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.AppImage
 
     # osx-x64 runs on the ARM64 macos-latest runner via Rosetta 2, which is not
     # preinstalled - it must be explicitly installed before the smoke-test step
