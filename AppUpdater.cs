@@ -59,19 +59,20 @@ internal static class AppUpdater
             : OperatingSystem.IsMacOS() ? "osx"
             : OperatingSystem.IsLinux() ? "linux"
             : "";
-        return GetAssetName(os, RuntimeInformation.ProcessArchitecture, AppPaths.AppBundlePath != null);
+        return GetAssetName(os, RuntimeInformation.ProcessArchitecture, AppPaths.AppBundlePath != null, AppPaths.IsAppImage);
     }
 
     // macOS has two installs: the plain folder (.zip, what every version before the
     // .dmg installed and still updates from) and the .app bundle (.dmg), which
-    // updates from a zip of the whole bundle.
-    public static string GetAssetName(string os, Architecture architecture, bool appBundle = false)
+    // updates from a zip of the whole bundle. Linux likewise: the plain single-file
+    // binary and the AppImage, each updating from its own asset.
+    public static string GetAssetName(string os, Architecture architecture, bool appBundle = false, bool appImage = false)
     {
         string arch = architecture == Architecture.Arm64 ? "arm64" : "x64";
         return os switch
         {
             "win" => $"YouTubeDownloader-win-{arch}.exe",
-            "linux" => $"YouTubeDownloader-linux-{arch}",
+            "linux" => appImage ? $"YouTubeDownloader-linux-{arch}.AppImage" : $"YouTubeDownloader-linux-{arch}",
             "osx" => appBundle ? $"YouTubeDownloader-osx-{arch}-app.zip" : $"YouTubeDownloader-osx-{arch}.zip",
             _ => throw new PlatformNotSupportedException("App self-update is only supported on Windows, Linux, and macOS.")
         };
@@ -144,6 +145,18 @@ internal static class AppUpdater
         {
             return false;
         }
+    }
+
+    // The file self-update replaces: the .AppImage when started from one (the exe
+    // inside lives on a read-only mount), otherwise the running exe.
+    public static string? UpdateTargetPath => AppPaths.AppImagePath ?? Environment.ProcessPath;
+
+    // The folder self-update writes to. A macOS .app bundle is replaced as a whole
+    // and an AppImage as a file - both from the folder holding them.
+    public static string GetInstallDirectory(string appDirectory, string? appBundlePath, string? appImagePath)
+    {
+        string? holder = appBundlePath ?? appImagePath;
+        return holder != null ? Path.GetDirectoryName(holder) ?? appDirectory : appDirectory;
     }
 
     public static List<(string Source, string Target)> BuildFileList(string extractedDirectory, string appDirectory) =>
@@ -228,17 +241,27 @@ internal static class AppUpdater
         using var process = Process.Start(startInfo);
     }
 
-    // Waits for this PID, then renames (atomic within one folder). Positional
-    // parameters ($1..$3), so no path ever needs shell quoting.
-    private const string UnixSwapScript =
-        "while kill -0 \"$1\" 2>/dev/null; do sleep 0.2; done; mv -f \"$2\" \"$3\"; exec \"$3\"";
+    // Waits for this PID, then renames (atomic within one folder) and starts the
+    // result - the exe, or the .AppImage, whose old copy the AppImage runtime may
+    // still hold open (Linux allows that). Positional parameters ($1..$3), so no
+    // path ever needs shell quoting. appimage/smoke-test.sh runs this exact text
+    // against a real AppImage - keep it a raw literal between the BEGIN/END lines.
+    // BEGIN UnixSwapScript
+    private const string UnixSwapScript = """
+        while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
+        mv -f "$2" "$3"
+        exec "$3"
+        """;
+    // END UnixSwapScript
 
     private static ProcessStartInfo UnixSwapAfterExit(string downloadPath, string executablePath) =>
         new("/bin/sh")
         {
+            // A raw literal takes the source file's line endings - CRLF in a Windows
+            // checkout (build.bat cross-compiles linux too), and sh rejects "done\r".
             ArgumentList =
             {
-                "-c", UnixSwapScript, "sh",
+                "-c", UnixSwapScript.ReplaceLineEndings("\n"), "sh",
                 Environment.ProcessId.ToString(CultureInfo.InvariantCulture),
                 downloadPath, executablePath
             }

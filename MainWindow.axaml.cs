@@ -59,7 +59,7 @@ public partial class MainWindow : Window
 
         // Remove what a previous self-update left behind (<exe>.old on Windows is
         // only deletable once the old process has exited).
-        AppUpdater.CleanupLeftovers(appDirectory, Environment.ProcessPath);
+        AppUpdater.CleanupLeftovers(appDirectory, AppUpdater.UpdateTargetPath);
         if (AppPaths.AppBundlePath is { } appBundlePath)
             AppUpdater.CleanupBundleLeftovers(appBundlePath, dataDirectory);
 
@@ -954,12 +954,10 @@ public partial class MainWindow : Window
         if (!confirmed)
             return;
 
-        // A macOS .app bundle is replaced as a whole, which takes write access to
-        // the folder holding it (/Applications) - not there when it runs straight
-        // from the mounted .dmg or translocated by Gatekeeper.
-        string installDirectory = AppPaths.AppBundlePath is { } bundlePath
-            ? Path.GetDirectoryName(bundlePath) ?? appDirectory
-            : appDirectory;
+        // A macOS .app bundle and an AppImage are replaced from the folder holding
+        // them (/Applications, ~/Applications) - not writable for a bundle straight
+        // from the mounted .dmg or translocated by Gatekeeper, or an AppImage in /opt.
+        string installDirectory = AppUpdater.GetInstallDirectory(appDirectory, AppPaths.AppBundlePath, AppPaths.AppImagePath);
         if (!AppUpdater.CanWriteDirectory(installDirectory))
         {
             bool openPage = await MessageDialog.ShowConfirmAsync(this,
@@ -975,7 +973,8 @@ public partial class MainWindow : Window
 
     private async Task InstallAppUpdate(ReleaseInfo release, ReleaseAsset asset)
     {
-        string? exePath = Environment.ProcessPath;
+        // The .AppImage itself when started from one - see AppUpdater.UpdateTargetPath.
+        string? exePath = AppUpdater.UpdateTargetPath;
         if (string.IsNullOrEmpty(exePath))
         {
             await MessageDialog.ShowAsync(this, Ui.ErrorNoAppPath, Ui.TitleError);
