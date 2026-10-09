@@ -4,7 +4,7 @@
 
 <img src="logo.svg" alt="YouTube Downloader Logo" width="480"/>
 
-![Version](https://img.shields.io/badge/Version-2.0.300926-brightgreen)
+![Version](https://img.shields.io/badge/Version-2.0.091026-brightgreen)
 ![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)
 ![C#](https://img.shields.io/badge/C%23-13-239120?logo=csharp)
 ![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-0078D6?logo=windows)
@@ -25,6 +25,10 @@
 ### 📝 Opis
 
 YouTube Downloader to aplikacja desktopowa na Windows, Linux i macOS (x64/ARM64), zbudowana w .NET 10 i Avalonia UI, która umożliwia pobieranie filmów i plików audio z YouTube. Aplikacja automatycznie zarządza swoimi zależnościami (yt-dlp, FFmpeg, Deno) i oferuje przyjazny interfejs w języku polskim i angielskim do wyboru jakości i formatu pobierania.
+
+### 🆕 Co nowego w wersji 2.0.091026
+
+- 🐧 **AppImage dla Linuksa** - w każdym wydaniu jest teraz plik `YouTubeDownloader-linux-x64.AppImage` (i `-linux-arm64.AppImage`): wystarczy nadać mu prawo wykonywania i uruchomić, bez instalacji. Ma wbudowany skrót z ikoną, więc AppImageLauncher czy Gear Lever dodadzą go do menu. Pobrane pliki trafiają do folderu Pobrane, do „YouTube Downloader”, a automatyczna aktualizacja podmienia cały plik `.AppImage`. Zwykły plik `YouTubeDownloader-linux-x64` jest nadal publikowany i aktualizuje się jak wcześniej
 
 ### 🆕 Co nowego w wersji 2.0.300926
 
@@ -150,7 +154,7 @@ dotnet publish -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=
 dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true
 ```
 
-Zamiast wywoływać `dotnet publish` ręcznie, można też użyć `build.bat` (Windows, domyślnie `win-x64`) lub `build.sh` (Linux/macOS, domyślnie `linux-x64`), np. `build.bat win-arm64` lub `./build.sh osx-arm64`.
+Zamiast wywoływać `dotnet publish` ręcznie, można też użyć `build.bat` (Windows, domyślnie `win-x64`) lub `build.sh` (Linux/macOS, domyślnie `linux-x64`), np. `build.bat win-arm64` lub `./build.sh osx-arm64`. Na Linuksie `./build.sh appimage-x64` (lub `appimage-arm64`) buduje też AppImage.
 
 **Framework-dependent:**
 ```bash
@@ -173,6 +177,14 @@ sudo snap install yt-downloader-bp
 
 Wersję snap aktualizuje Snap Store (automatyczna aktualizacja w samej aplikacji jest w niej wyłączona). Pobrane pliki trafiają do systemowego folderu pobranych, do podfolderu `YouTube Downloader` (np. `~/Pobrane/YouTube Downloader`). Jeśli folder pobranych leży na innym dysku (`/media`, `/mnt` - także przez dowiązanie z `~/Pobrane`), zezwól na to raz: `sudo snap connect yt-downloader-bp:removable-media`.
 
+### 🐧 AppImage (Linux)
+
+1. Pobierz z [najnowszego wydania](https://github.com/bauerpawel/YouTube-Downloader/releases/latest) plik `YouTubeDownloader-linux-x64.AppImage` (procesory Intel/AMD) albo `YouTubeDownloader-linux-arm64.AppImage` (ARM64)
+2. Nadaj mu prawo wykonywania: `chmod +x YouTubeDownloader-linux-x64.AppImage` (albo we właściwościach pliku w menedżerze plików)
+3. Uruchom go dwuklikiem lub z terminala: `./YouTubeDownloader-linux-x64.AppImage`
+
+Pobrane pliki trafiają do systemowego folderu pobranych, do podfolderu `YouTube Downloader` (np. `~/Pobrane/YouTube Downloader`). Aplikacja aktualizuje się sama, gdy plik `.AppImage` leży w folderze, do którego masz prawo zapisu (np. `~/Applications`). AppImage potrzebuje FUSE (`fusermount3`, jest w każdej współczesnej dystrybucji desktopowej; biblioteka libfuse2 nie jest potrzebna). Bez FUSE uruchom go z opcją `--appimage-extract-and-run`. Własny AppImage zbudujesz na Linuksie poleceniem `./build.sh appimage-x64` (lub `appimage-arm64`).
+
 ### 🍎 Instalacja na macOS
 
 1. Pobierz z [najnowszego wydania](https://github.com/bauerpawel/YouTube-Downloader/releases/latest) plik `YouTubeDownloader-osx-arm64.dmg` (Apple Silicon: M1 i nowsze) albo `YouTubeDownloader-osx-x64.dmg` (Intel)
@@ -189,7 +201,7 @@ Pobrane pliki trafiają do `~/Downloads/YouTube Downloader` (w Finderze: Pobrane
 4. **Wybierz jakość** - Od "Najlepsza" do 240p (w trybie audio pole jest nieaktywne)
 5. **Wybierz format** - mp4 (zalecany), webm lub mkv
 6. **Kliknij "Pobierz"** - Aplikacja rozpocznie pobieranie i pokaże postęp
-7. **Pliki w folderze downloads** - Pobrane pliki znajdziesz w folderze `downloads` w katalogu aplikacji (w wersji snap i w aplikacji z `.dmg` na macOS: `YouTube Downloader` w folderze Pobrane)
+7. **Pliki w folderze downloads** - Pobrane pliki znajdziesz w folderze `downloads` w katalogu aplikacji (w wersji snap, w AppImage i w aplikacji z `.dmg` na macOS: `YouTube Downloader` w folderze Pobrane)
 
 Język interfejsu zmienisz w menu **Widok → Język** (Polski / English). Przy pierwszym uruchomieniu dobierany jest do języka systemu.
 
@@ -236,7 +248,8 @@ YouTube-Downloader/
 ├── icon.svg                     # Ikona aplikacji (SVG) - ikona snapa, źródło app.ico i app-logo.png
 ├── logo.svg                     # Logo z nazwą (SVG), na górze tego pliku
 ├── build.bat                    # Owija `dotnet publish` dla win-x64/win-arm64
-├── build.sh                     # Owija `dotnet publish` dla linux-x64/linux-arm64/osx-x64/osx-arm64
+├── build.sh                     # Owija `dotnet publish` dla linux-x64/linux-arm64/osx-x64/osx-arm64, buduje AppImage
+├── appimage/                    # AppImage dla Linuksa: package.sh, skrót .desktop i test (smoke-test.sh)
 ├── macos/                       # Instalator macOS: paczka .app, ikona, .dmg (package.sh) i jego test (smoke-test.sh)
 ├── snap/                        # Pakiet Snap Store (snapcraft.yaml, skrót w menu)
 ├── README.md                    # Dokumentacja projektu
@@ -272,6 +285,10 @@ Zgłoszenia błędów i pull requesty są mile widziane na GitHub.
 ### 📝 Description
 
 YouTube Downloader is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables downloading videos and audio from YouTube. The application automatically manages its dependencies (yt-dlp, FFmpeg, Deno) and provides a user-friendly Polish and English interface for selecting download quality and format.
+
+### 🆕 What's New in 2.0.091026
+
+- 🐧 **AppImage for Linux** - every release now has `YouTubeDownloader-linux-x64.AppImage` (and `-linux-arm64.AppImage`): make it executable and run it, nothing to install. It carries its own menu entry and icon, so AppImageLauncher or Gear Lever add it to your app menu. Downloads go to your Downloads folder, in "YouTube Downloader", and the automatic update replaces the whole `.AppImage` file. The plain `YouTubeDownloader-linux-x64` file is still published and updates as before
 
 ### 🆕 What's New in 2.0.300926
 
@@ -397,7 +414,7 @@ dotnet publish -c Release -r osx-x64 --self-contained true -p:PublishSingleFile=
 dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true
 ```
 
-Instead of calling `dotnet publish` directly, you can also use `build.bat` (Windows, defaults to `win-x64`) or `build.sh` (Linux/macOS, defaults to `linux-x64`), e.g. `build.bat win-arm64` or `./build.sh osx-arm64`.
+Instead of calling `dotnet publish` directly, you can also use `build.bat` (Windows, defaults to `win-x64`) or `build.sh` (Linux/macOS, defaults to `linux-x64`), e.g. `build.bat win-arm64` or `./build.sh osx-arm64`. On Linux, `./build.sh appimage-x64` (or `appimage-arm64`) also builds the AppImage.
 
 **Framework-dependent:**
 ```bash
@@ -420,6 +437,14 @@ sudo snap install yt-downloader-bp
 
 The snap is updated by the Snap Store (the in-app self-update is off there). Downloads go to your system Downloads folder, into a `YouTube Downloader` subfolder (e.g. `~/Downloads/YouTube Downloader`). If your Downloads folder is on another drive (`/media`, `/mnt` - also via a symlink from `~/Downloads`), allow it once: `sudo snap connect yt-downloader-bp:removable-media`.
 
+### 🐧 AppImage (Linux)
+
+1. Download `YouTubeDownloader-linux-x64.AppImage` (Intel/AMD processors) or `YouTubeDownloader-linux-arm64.AppImage` (ARM64) from the [latest release](https://github.com/bauerpawel/YouTube-Downloader/releases/latest)
+2. Make it executable: `chmod +x YouTubeDownloader-linux-x64.AppImage` (or in the file's properties in your file manager)
+3. Double-click it or run it from a terminal: `./YouTubeDownloader-linux-x64.AppImage`
+
+Downloads go to your system Downloads folder, into a `YouTube Downloader` subfolder (e.g. `~/Downloads/YouTube Downloader`). The app updates itself when the `.AppImage` sits in a folder you can write to (such as `~/Applications`). AppImages need FUSE (`fusermount3`, present on every current desktop distribution; libfuse2 is not needed). Without FUSE, run it with `--appimage-extract-and-run`. To build your own AppImage on Linux, run `./build.sh appimage-x64` (or `appimage-arm64`).
+
 ### 🍎 Install on macOS
 
 1. Download `YouTubeDownloader-osx-arm64.dmg` (Apple Silicon: M1 and later) or `YouTubeDownloader-osx-x64.dmg` (Intel) from the [latest release](https://github.com/bauerpawel/YouTube-Downloader/releases/latest)
@@ -436,7 +461,7 @@ Downloads go to `~/Downloads/YouTube Downloader`. On the first download macOS as
 4. **Select the quality** - From "Best" down to 240p (disabled in audio mode)
 5. **Select the format** - mp4 (recommended), webm, or mkv
 6. **Click "Download"** - The application starts downloading and shows the progress
-7. **Files in the downloads folder** - Downloaded files will be in the `downloads` folder in the application directory (snap and the macOS app from the `.dmg`: `YouTube Downloader` in your Downloads folder)
+7. **Files in the downloads folder** - Downloaded files will be in the `downloads` folder in the application directory (snap, AppImage and the macOS app from the `.dmg`: `YouTube Downloader` in your Downloads folder)
 
 The interface language can be changed in **View → Language** (Polski / English). On first launch it follows the system language.
 
@@ -483,7 +508,8 @@ YouTube-Downloader/
 ├── icon.svg                     # Application icon (SVG) - the snap icon, source of app.ico and app-logo.png
 ├── logo.svg                     # Logo with the app name (SVG), at the top of this file
 ├── build.bat                    # Wraps `dotnet publish` for win-x64/win-arm64
-├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64/osx-x64/osx-arm64
+├── build.sh                     # Wraps `dotnet publish` for linux-x64/linux-arm64/osx-x64/osx-arm64, builds the AppImage
+├── appimage/                    # Linux AppImage: package.sh, .desktop menu entry and its test (smoke-test.sh)
 ├── macos/                       # macOS installer: .app bundle, icon, .dmg (package.sh) and its test (smoke-test.sh)
 ├── snap/                        # Snap Store package (snapcraft.yaml, menu entry)
 ├── README.md                    # Project documentation

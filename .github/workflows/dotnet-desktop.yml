@@ -129,8 +129,50 @@ jobs:
         YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: bash tests/macos_smoke.sh ./startup-publish
 
+  # Linux AppImage on both architectures natively: real FUSE mount, tool
+  # download and the self-update swap script - see appimage/smoke-test.sh.
+  # Read-only token, as in the snap job: the app runs the latest yt-dlp, Deno and
+  # FFmpeg, which inherit the environment. Runs on pull requests too.
+  linux-startup:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            runner: ubuntu-latest
+          - rid: linux-arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        persist-credentials: false
+    - uses: actions/setup-dotnet@v6
+      with:
+        dotnet-version: 10.0.x
+    # Same flags as the publish job.
+    - name: Publish Linux test application
+      run: |
+        dotnet publish YouTubeDownloader.csproj -c Release -r ${{ matrix.rid }} --self-contained true \
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+          -p:EnableCompressionInSingleFile=true -o ./startup-publish
+    - name: Build AppImage
+      run: |
+        version=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' YouTubeDownloader.csproj)
+        bash appimage/package.sh ./startup-publish/YouTubeDownloader ./startup-dist ${{ matrix.rid }} "$version-${{ github.run_number }}"
+    - name: Smoke-test AppImage
+      env:
+        YTD_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: bash appimage/smoke-test.sh ./startup-dist/YouTubeDownloader-${{ matrix.rid }}.AppImage
+
   publish:
-    needs: [build, media-tests, macos-startup]
+    needs: [build, media-tests, macos-startup, linux-startup]
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'  # not on forked PRs
 
     strategy:
@@ -308,6 +350,17 @@ jobs:
         kill $APP_PID 2>/dev/null || true
         rm -rf "$SMOKE"
 
+    # Linux AppImage: the single-file binary above in an AppDir with its .desktop
+    # entry and icon, packed by a pinned appimagetool with the static type2
+    # runtime (users need no libfuse2). Into ./dist, so the publish-folder zip
+    # below does not pick it up. Either host packs either architecture. The
+    # linux-startup job smoke-tests the same AppImage, built from the same commit,
+    # with a read-only token.
+    - name: Build AppImage (Linux)
+      if: runner.os == 'Linux'
+      shell: bash
+      run: bash appimage/package.sh ./publish/${{ matrix.rid }}/${{ matrix.exeName }} ./dist/${{ matrix.rid }} ${{ matrix.rid }} ${{ steps.get_version.outputs.version }}-${{ github.run_number }}
+
     # osx-x64 runs on the ARM64 macos-latest runner via Rosetta 2, which is not
     # preinstalled - it must be explicitly installed before the smoke-test step
     # below can execute the x64 binary. Not needed for osx-arm64 (runs natively)
@@ -433,8 +486,8 @@ jobs:
     # Create/update a GitHub Release and upload the exe and zip as release assets
     # Note: actions/create-release and actions/upload-release-asset are archived/unmaintained,
     # replaced with softprops/action-gh-release which covers both in one step.
-    - name: Create Release (Windows/Linux)
-      if: runner.os != 'macOS'
+    - name: Create Release (Windows)
+      if: runner.os == 'Windows'
       uses: softprops/action-gh-release@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -446,6 +499,25 @@ jobs:
         prerelease: false
         files: |
           ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
+          ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
+
+    # Linux: the plain single-file binary (installs from before the AppImage
+    # update from it), the AppImage (and what AppImage installs update from) and
+    # the zip.
+    - name: Create Release (Linux)
+      if: runner.os == 'Linux'
+      uses: softprops/action-gh-release@v3
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ steps.get_version.outputs.version }}-${{ github.run_number }}
+        name: v${{ steps.get_version.outputs.version }} (build ${{ github.run_number }})
+        body: Automated release for version ${{ steps.get_version.outputs.version }}, run ${{ github.run_id }} (commit ${{ github.sha }})
+        draft: false
+        prerelease: false
+        files: |
+          ./publish/${{ matrix.rid }}/${{ matrix.releaseExeName }}
+          ./dist/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.AppImage
           ./publish/${{ matrix.rid }}/YouTubeDownloader-${{ matrix.rid }}.zip
 
     # macOS isn't single-file (see "Publish Application"), so there is no

@@ -44,6 +44,11 @@ internal static class Program
                     return 0;
             }
         }
+        if (args.Length >= 1 && args[0] == "--data-directory")
+        {
+            Console.WriteLine(AppPaths.DataDirectory);
+            return 0;
+        }
         if (args.Length >= 3 && args[0] == "--probe-component")
         {
             Console.WriteLine(args[1] switch
