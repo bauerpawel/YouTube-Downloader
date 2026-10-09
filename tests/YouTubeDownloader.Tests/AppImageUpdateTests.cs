@@ -62,6 +62,37 @@ public class AppImageUpdateTests
         Assert.True(File.Exists(other + AppUpdater.NewSuffix));
     }
 
+    // --appimage-extract-and-run (no FUSE): the runtime takes the flag out of the
+    // arguments, so the restarted AppImage must get it as an environment variable,
+    // or it tries FUSE, fails and the app never comes back after an update.
+    [Theory]
+    [InlineData("/tmp/appimage_extracted_0123456789abcdef", true)]
+    [InlineData("/tmp/appimage_extracted_0123456789abcdef/", true)]
+    [InlineData("/tmp/.mount_YouTubAbC123", false)]
+    [InlineData("/tmp/.mount_appimage_extracted_", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void RecognizesTheExtractAndRunFolder(string? appDir, bool expected)
+    {
+        Assert.Equal(expected, AppPaths.IsExtractAndRunDirectory(appDir));
+    }
+
+    [Fact]
+    public void SwapOfAnExtractedAppImageRestartsItExtracted()
+    {
+        var extracted = AppUpdater.CreateUnixSwap("/a/YTD.AppImage.new", "/a/YTD.AppImage", extractAndRun: true);
+        Assert.Equal("1", extracted.Environment["APPIMAGE_EXTRACT_AND_RUN"]);
+
+        var mounted = AppUpdater.CreateUnixSwap("/a/YTD.AppImage.new", "/a/YTD.AppImage", extractAndRun: false);
+        // A FUSE-mounted AppImage restarts with the environment it inherited.
+        Assert.Equal(Environment.GetEnvironmentVariable("APPIMAGE_EXTRACT_AND_RUN"),
+            mounted.Environment.TryGetValue("APPIMAGE_EXTRACT_AND_RUN", out string? value) ? value : null);
+
+        // The script gets the paths as positional parameters either way.
+        Assert.Equal("/bin/sh", extracted.FileName);
+        Assert.Equal(new[] { "/a/YTD.AppImage.new", "/a/YTD.AppImage" }, extracted.ArgumentList.TakeLast(2));
+    }
+
     private static string NewTempDir()
     {
         string dir = Path.Combine(Path.GetTempPath(), "ytd-tests-" + Guid.NewGuid().ToString("N"));

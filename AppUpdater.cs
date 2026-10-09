@@ -255,7 +255,14 @@ internal static class AppUpdater
     // END UnixSwapScript
 
     private static ProcessStartInfo UnixSwapAfterExit(string downloadPath, string executablePath) =>
-        new("/bin/sh")
+        CreateUnixSwap(downloadPath, executablePath, AppPaths.IsAppImageExtractAndRun);
+
+    // The AppImage runtime takes --appimage-extract-and-run out of the arguments,
+    // so an AppImage started that way (no FUSE) would restart through FUSE, fail
+    // and never come back; the runtime honours the same switch as a variable.
+    public static ProcessStartInfo CreateUnixSwap(string downloadPath, string executablePath, bool extractAndRun)
+    {
+        var startInfo = new ProcessStartInfo("/bin/sh")
         {
             // A raw literal takes the source file's line endings - CRLF in a Windows
             // checkout (build.bat cross-compiles linux too), and sh rejects "done\r".
@@ -266,6 +273,10 @@ internal static class AppUpdater
                 downloadPath, executablePath
             }
         };
+        if (extractAndRun)
+            startInfo.Environment["APPIMAGE_EXTRACT_AND_RUN"] = "1";
+        return startInfo;
+    }
 
     // cmd cannot wait for a PID and needs not: Windows refuses to replace an exe
     // that is still running, so `move` succeeds exactly once the app is gone.

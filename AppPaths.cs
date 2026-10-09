@@ -87,6 +87,15 @@ internal static class AppPaths
 
     public static bool IsAppImage => AppImagePath != null;
 
+    // Started with --appimage-extract-and-run (no FUSE): the runtime unpacked the
+    // image into $TMPDIR/appimage_extracted_<md5> and set APPDIR there.
+    public static bool IsAppImageExtractAndRun =>
+        IsAppImage && IsExtractAndRunDirectory(Environment.GetEnvironmentVariable("APPDIR"));
+
+    public static bool IsExtractAndRunDirectory(string? appDir) =>
+        !string.IsNullOrEmpty(appDir)
+        && Path.GetFileName(Path.TrimEndingDirectorySeparator(appDir)).StartsWith("appimage_extracted_", StringComparison.Ordinal);
+
     // As with SNAP: another AppImage (Cursor, Obsidian...) leaks APPIMAGE and
     // APPDIR into its terminal and everything started from there, the plain Linux
     // build included - which would then update by replacing that app's file. Ours
