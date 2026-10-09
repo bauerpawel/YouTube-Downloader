@@ -80,11 +80,22 @@ fi
 mkdir -p "$INSTALL"
 cp "$1" "$APP"
 chmod +x "$APP"
-# Own X server instead of xvfb-run, so $! below is the app's PID.
-Xvfb :99 -screen 0 1280x1024x24 -ac > /dev/null 2>&1 &
+# Own X server instead of xvfb-run, so $! below is the app's PID. Xvfb picks a
+# free display itself (-displayfd): an earlier xvfb-run in the same job may still
+# hold :99, and the app would then reach that server and fail its authorization.
+Xvfb -displayfd 3 -screen 0 1280x1024x24 -ac 3> "$T/display" > /dev/null 2>&1 &
 XVFB_PID=$!
-export DISPLAY=:99
-sleep 2
+for i in $(seq 1 20); do
+    if [ -s "$T/display" ]; then
+        break
+    fi
+    sleep 0.5
+done
+if [ ! -s "$T/display" ]; then
+    fail "Xvfb did not start"
+fi
+export DISPLAY=":$(head -n 1 "$T/display")"
+echo "Xvfb on $DISPLAY"
 
 echo "== 1. Start through FUSE"
 "$APP" > "$LOG" 2>&1 &
