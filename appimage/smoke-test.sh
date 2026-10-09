@@ -113,6 +113,18 @@ if ! runs_from_mount "$APP_PID"; then
     fail "the app does not run from an AppImage mount after 30 s"
 fi
 echo "app runs from $(readlink "/proc/$APP_PID/exe")"
+# What AppPaths.FindAppImage() decides on: APPIMAGE is this file and the exe lies
+# under APPDIR - otherwise the app takes itself for the plain binary, writes to
+# the read-only mount and updates the wrong file.
+APP_ENV=$(tr '\0' '\n' < "/proc/$APP_PID/environ")
+if ! printf '%s\n' "$APP_ENV" | grep -qxF "APPIMAGE=$(realpath "$APP")"; then
+    fail "the runtime did not set APPIMAGE to $(realpath "$APP"): $(printf '%s\n' "$APP_ENV" | grep '^APPIMAGE=' || true)"
+fi
+APPDIR_VALUE=$(printf '%s\n' "$APP_ENV" | sed -n 's/^APPDIR=//p')
+case "$(readlink "/proc/$APP_PID/exe")" in
+    "$APPDIR_VALUE"/*) echo "APPIMAGE and APPDIR ($APPDIR_VALUE) identify the AppImage" ;;
+    *) fail "the exe does not lie under APPDIR='$APPDIR_VALUE'" ;;
+esac
 
 echo "== 2. Tools verified in the data folder, nothing next to the AppImage"
 # Up to 180 s, checked every 5 s - as in the plain Linux smoke test.
