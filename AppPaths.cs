@@ -5,7 +5,7 @@ namespace YouTubeDownloader;
 
 // The app folder (AppDirectory) holds only the app itself plus downloads/.
 // Everything the app downloads or writes lives in DataDirectory, so the app
-// folder can be read-only (snap, Program Files) and self-update only ever
+// folder can be read-only (snap, AppImage, Program Files) and self-update only ever
 // replaces the app's own files.
 internal static class AppPaths
 {
@@ -30,6 +30,7 @@ internal static class AppPaths
     private static readonly Lazy<string> downloadsDirectory = new(() => ResolveDownloadsDirectory(
         IsSnap,
         AppBundlePath != null,
+        IsAppImage,
         AppContext.BaseDirectory,
         Environment.GetEnvironmentVariable("SNAP_REAL_HOME"),
         Environment.GetEnvironmentVariable("SNAP_USER_COMMON"),
@@ -39,8 +40,9 @@ internal static class AppPaths
 
     public static string DataDirectory => dataDirectory.Value;
 
-    // Next to the app, except in a snap ($SNAP is read-only there) and in a macOS
-    // .app bundle (it must stay unmodified and self-update replaces it whole).
+    // Next to the app, except in a snap and an AppImage (both run from a read-only
+    // mount) and in a macOS .app bundle (it must stay unmodified and self-update
+    // replaces it whole).
     public static string DownloadsDirectory => downloadsDirectory.Value;
 
     // macOS installed from the .dmg: the exe runs from <name>.app/Contents/MacOS.
@@ -70,14 +72,37 @@ internal static class AppPaths
     // folders. Our own snap runs the exe from under $SNAP.
     public static bool IsSnap => isSnap.Value;
 
-    public static bool IsRunningFromSnap(string? snap, string appDirectory)
+    public static bool IsRunningFromSnap(string? snap, string appDirectory) => IsUnder(snap, appDirectory);
+
+    private static readonly Lazy<string?> appImagePath = new(() =>
+        OperatingSystem.IsLinux() && !IsSnap
+            ? FindAppImage(Environment.GetEnvironmentVariable("APPIMAGE"),
+                Environment.GetEnvironmentVariable("APPDIR"), AppContext.BaseDirectory)
+            : null);
+
+    // Started from an AppImage: the .AppImage file. Its runtime mounts the image
+    // read-only at APPDIR, where the exe runs, so self-update replaces this file
+    // instead. null otherwise.
+    public static string? AppImagePath => appImagePath.Value;
+
+    public static bool IsAppImage => AppImagePath != null;
+
+    // As with SNAP: another AppImage (Cursor, Obsidian...) leaks APPIMAGE and
+    // APPDIR into its terminal and everything started from there, the plain Linux
+    // build included - which would then update by replacing that app's file. Ours
+    // runs the exe from under APPDIR (the mount, or the --appimage-extract-and-run
+    // folder).
+    public static string? FindAppImage(string? appImage, string? appDir, string appDirectory) =>
+        !string.IsNullOrEmpty(appImage) && IsUnder(appDir, appDirectory) ? appImage : null;
+
+    private static bool IsUnder(string? root, string directory)
     {
-        if (string.IsNullOrEmpty(snap))
+        if (string.IsNullOrEmpty(root))
             return false;
 
-        string root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(snap)) + Path.DirectorySeparatorChar;
-        string app = Path.TrimEndingDirectorySeparator(Path.GetFullPath(appDirectory)) + Path.DirectorySeparatorChar;
-        return app.StartsWith(root, StringComparison.Ordinal);
+        string rootPrefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar;
+        string path = Path.TrimEndingDirectorySeparator(Path.GetFullPath(directory)) + Path.DirectorySeparatorChar;
+        return path.StartsWith(rootPrefix, StringComparison.Ordinal);
     }
 
     public static string ResolveDataDirectory(string? snapUserCommon, string localAppData, string appDirectory)
@@ -91,24 +116,26 @@ internal static class AppPaths
         return Path.Combine(localAppData, DataFolderName);
     }
 
-    // Inside a snap: the user's Downloads folder (the desktop interface may read
-    // ~/.config/user-dirs.dirs, the home interface may write there) plus a
-    // folder of our own. $HOME is ~/snap/<name>/<revision> there; snapd passes
-    // the real one in SNAP_REAL_HOME. Without it (old snapd) $SNAP_USER_COMMON,
-    // never the versioned $HOME: snapd copies that on every refresh, videos
-    // included. A macOS .app bundle uses ~/Downloads plus the same folder.
+    // Inside a snap and an AppImage: the user's Downloads folder (in a snap the
+    // desktop interface may read ~/.config/user-dirs.dirs, the home interface may
+    // write there) plus a folder of our own. In a snap $HOME is
+    // ~/snap/<name>/<revision>; snapd passes the real one in SNAP_REAL_HOME.
+    // Without it (old snapd) $SNAP_USER_COMMON, never the versioned $HOME: snapd
+    // copies that on every refresh, videos included. An AppImage runs in the real
+    // home. A macOS .app bundle uses ~/Downloads plus the same folder.
     public const string UserDownloadsFolderName = "YouTube Downloader";
 
-    public static string ResolveDownloadsDirectory(bool isSnap, bool isAppBundle, string appDirectory,
+    public static string ResolveDownloadsDirectory(bool isSnap, bool isAppBundle, bool isAppImage, string appDirectory,
         string? snapRealHome, string? snapUserCommon, string userProfile)
     {
         if (isAppBundle)
             return Path.Combine(userProfile, "Downloads", UserDownloadsFolderName);
 
-        if (!isSnap)
+        if (!isSnap && !isAppImage)
             return Path.Combine(appDirectory, "downloads");
 
-        string realHome = !string.IsNullOrEmpty(snapRealHome) ? snapRealHome
+        string realHome = !isSnap ? userProfile
+            : !string.IsNullOrEmpty(snapRealHome) ? snapRealHome
             : !string.IsNullOrEmpty(snapUserCommon) ? snapUserCommon
             : userProfile;
         string? userDirs = TryReadAllText(Path.Combine(realHome, ".config", "user-dirs.dirs"));
