@@ -180,7 +180,12 @@ internal static class AppPaths
         string appDirectory = AppContext.BaseDirectory;
         string directory = ResolveDataDirectory(
             IsSnap ? Environment.GetEnvironmentVariable("SNAP_USER_COMMON") : null,
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            // DoNotVerify: without it .NET returns "" when ~/.local/share (or
+            // XDG_DATA_HOME) does not exist yet, and the app would fall back to its
+            // own folder - a read-only mount in an AppImage. CreateDirectory below
+            // creates the whole path.
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData,
+                Environment.SpecialFolderOption.DoNotVerify),
             appDirectory);
 
         try
