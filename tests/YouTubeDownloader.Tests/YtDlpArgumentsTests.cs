@@ -76,9 +76,10 @@ public class YtDlpArgumentsTests
         string[] expected = info.ArgumentList.ToArray();
         // Execute only our harmless argument-echo entry point, never yt-dlp or --exec.
         info.ArgumentList.Insert(0, typeof(Program).Assembly.Location);
+        info.ArgumentList.Insert(1, "--echo-arguments");
         string? outputLine = null;
 
-        var (exitCode, error) = await ProcessRunner.RunAsync(info, line => outputLine = line);
+        var (exitCode, error) = await ProcessRunner.RunAsync(info, line => outputLine = line, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.Equal(0, exitCode);
         Assert.Empty(error);

@@ -111,7 +111,7 @@ public class AppImagePathsTests
         command.Environment["XDG_DATA_HOME"] = dataHome;
         command.Environment.Remove("SNAP");
         var lines = new List<string>();
-        var (code, error) = await ProcessRunner.RunAsync(command, lines.Add);
+        var (code, error) = await ProcessRunner.RunAsync(command, lines.Add, cancellationToken: TestContext.Current.CancellationToken);
 
         Assert.True(code == 0, error);
         Assert.Equal(Path.Combine(dataHome, AppPaths.DataFolderName), Assert.Single(lines));

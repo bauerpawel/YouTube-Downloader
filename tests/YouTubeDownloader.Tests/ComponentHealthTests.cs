@@ -13,26 +13,26 @@ public class ComponentHealthTests
     [InlineData((int)ComponentTool.FFprobe, "ffprobe")]
     public async Task AcceptsRecognizedSuccessfulVersionOutput(int tool, string output)
     {
-        Assert.True(await ComponentHealth.CheckCommandAsync(Probe(output, "success"), (ComponentTool)tool));
+        Assert.True(await ComponentHealth.CheckCommandAsync(Probe(output, "success"), (ComponentTool)tool, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task RejectsNonzeroExitEvenWhenVersionOutputLooksValid()
     {
-        Assert.False(await ComponentHealth.CheckCommandAsync(Probe("yt-dlp", "fail"), ComponentTool.YtDlp));
+        Assert.False(await ComponentHealth.CheckCommandAsync(Probe("yt-dlp", "fail"), ComponentTool.YtDlp, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task RejectsUnrecognizedVersionOutput()
     {
-        Assert.False(await ComponentHealth.CheckCommandAsync(Probe("unknown", "success"), ComponentTool.YtDlp));
+        Assert.False(await ComponentHealth.CheckCommandAsync(Probe("unknown", "success"), ComponentTool.YtDlp, cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
     public async Task TerminatesAHungVersionCheck()
     {
         Assert.False(await ComponentHealth.CheckCommandAsync(Probe("yt-dlp", "hang"), ComponentTool.YtDlp,
-            TimeSpan.FromSeconds(1)));
+            TimeSpan.FromSeconds(1), cancellationToken: TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -49,8 +49,8 @@ public class ComponentHealthTests
     {
         using var directory = new TestDirectory();
         string executable = directory.PathFor("yt-dlp");
-        await File.WriteAllBytesAsync(executable, Array.Empty<byte>());
-        Assert.False(await ComponentHealth.CheckExecutableAsync(executable, ComponentTool.YtDlp));
+        await File.WriteAllBytesAsync(executable, Array.Empty<byte>(), TestContext.Current.CancellationToken);
+        Assert.False(await ComponentHealth.CheckExecutableAsync(executable, ComponentTool.YtDlp, cancellationToken: TestContext.Current.CancellationToken));
         Assert.False(await ComponentHealth.CheckFFmpegAsync(directory.Root));
     }
 
