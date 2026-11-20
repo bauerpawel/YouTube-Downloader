@@ -462,7 +462,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // macOS deliberately never reaches this method - it queries BtbN/FFmpeg-Builds, which only
+    // macOS deliberately never reaches this method - it queries FFmpeg-Builds/FFmpeg-Builds, which only
     // publishes Windows/Linux assets. macOS FFmpeg comes from GetLatestFFmpegInfoMac() instead;
     // both callers of GetLatestFFmpegInfo() (this method's only caller) already branch away from
     // macOS via OperatingSystem.IsMacOS() checks in DownloadFFmpeg() and CheckAndUpdateFFmpeg().
@@ -483,7 +483,7 @@ public partial class MainWindow : Window
     private async Task<ComponentRelease> GetLatestFFmpegInfo()
     {
         string json = await GitHubApi.GetStringAsync(httpClient,
-            "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases");
+            "https://api.github.com/repos/FFmpeg-Builds/FFmpeg-Builds/releases");
         return ComponentRelease.ParseBuilds(json, IsMatchingFFmpegAsset);
     }
 
