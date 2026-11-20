@@ -5,7 +5,7 @@
 **YouTube Downloader** is a Windows, Linux, and macOS desktop application built with .NET 10 and Avalonia UI that enables users to download videos and audio from YouTube, including from multiple links in a single run. The application automatically manages its dependencies (yt-dlp, FFmpeg, and Deno runtime) and provides a user-friendly Polish and English interface for selecting download quality and format.
 
 ### Key Information
-- **Technology Stack**: .NET 10, C# 13, Avalonia UI 12.1.2
+- **Technology Stack**: .NET 10, C# 13, Avalonia UI 12.1.6
 - **Target Platform**: Windows, Linux, and macOS (x64/ARM64), `net10.0`. Built and published for all three OSes, and CI-smoke-tested on `ubuntu-latest` and `macos-latest` in addition to `windows-latest` - see [Development Workflows](#development-workflows). macOS binaries are unsigned (no Apple Developer account) - users see a one-time Gatekeeper warning on first launch, see [External Dependencies](#external-dependencies)
 - **License**: Apache License 2.0
 - **Primary Language**: C# with Polish and English UI text (see `Strings.cs`)
@@ -414,7 +414,7 @@ This environment has no full GUI test automation - there is no headless/CI-runna
 - **UI text lives only in `Strings.cs`**, in both `Strings.Polish` and `Strings.English`. Every property is `required`, so a text missing from either language is a compile error; parameterized texts are `Func<>` properties. Code reads them via `Strings.Current` (`Ui` in `MainWindow`). Polish texts use proper diacritics; menu access keys (`_`) are chosen per language. XAML holds no user-facing text - windows set it in code (`MainWindow.ApplyTexts()`, the `AboutWindow`/`MessageDialog` constructors)
 
 ### Avalonia UI Conventions
-- **Framework**: Avalonia UI 12.1.2 (XAML + code-behind, no MVVM) - controls are declared in a `.axaml` file, and all logic lives in the paired `.axaml.cs` code-behind class
+- **Framework**: Avalonia UI 12.1.6 (XAML + code-behind, no MVVM) - controls are declared in a `.axaml` file, and all logic lives in the paired `.axaml.cs` code-behind class
 - `Name="TxtUrl"` in XAML generates a strongly-typed, **non-nullable** `TxtUrl` field on the code-behind class automatically - there is no manual field declaration step, unlike the old WinForms `private TextBox? txtUrl;` pattern
 - Event handlers are wired up explicitly in the constructor, after `InitializeComponent()`, e.g. `BtnDownload.Click += async (s, e) => await BtnDownload_Click();` - **not** via XAML `Click="..."` attributes. This keeps XAML parsing and code-behind compilation order independent and is the pattern used throughout this codebase
 - Property renames from WinForms: `IsEnabled` replaces `Enabled`; `ComboBox.SelectionChanged` replaces `ComboBox.SelectedIndexChanged`
@@ -635,10 +635,11 @@ Before committing changes, verify:
   - Alternative: Node.js (if available in PATH)
 
 ### NuGet Dependencies
-Three pinned Avalonia 12.1.2 packages (see `YouTubeDownloader.csproj`):
-- `Avalonia` (12.1.2) - core framework
-- `Avalonia.Desktop` (12.1.2) - desktop platform backend
-- `Avalonia.Themes.Fluent` (12.1.2) - the `FluentTheme` registered in `App.axaml`
+Four pinned Avalonia 12.1.6 packages (see `YouTubeDownloader.csproj`):
+- `Avalonia` (12.1.6) - core framework
+- `Avalonia.Desktop` (12.1.6) - desktop platform backend
+- `Avalonia.Fonts.Inter` (12.1.6) - the embedded Inter font registered by `WithInterFont()`
+- `Avalonia.Themes.Fluent` (12.1.6) - the `FluentTheme` registered in `App.axaml`
 
 Future dependency/CVE audits must cover these NuGet packages in addition to the external yt-dlp/FFmpeg/Deno binaries listed above.
 
@@ -688,6 +689,6 @@ This project follows standard Git practices:
 
 ---
 
-**Last Updated**: 2026-10-09
+**Last Updated**: 2026-11-20
 **For**: AI Assistants (Claude, etc.)
 **Project**: YouTube Downloader for Windows, Linux, and macOS (.NET 10)

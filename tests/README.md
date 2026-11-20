@@ -13,10 +13,10 @@ zatrzymywanie procesów potomnych i anulowanie kolejki.
 
 Testy multimedialne wymagają dodatkowo Pythona 3.10+, yt-dlp, FFmpeg z kodekami
 libx264/libvpx-vp9/libopus oraz ffprobe. Narzędzia muszą być dostępne w PATH;
-zmienna `YT_DLP` może wskazywać plik wykonywalny yt-dlp. CI używa yt-dlp 2026.08.19.
+zmienna `YT_DLP` może wskazywać plik wykonywalny yt-dlp. CI używa yt-dlp 2026.10.26.
 
 ```sh
-python -m pip install yt-dlp==2026.08.19
+python -m pip install yt-dlp==2026.10.26
 dotnet build tests/YouTubeDownloader.Tests/YouTubeDownloader.Tests.csproj -c Release
 python tests/media_smoke.py --argument-helper tests/YouTubeDownloader.Tests/bin/Release/net10.0/YouTubeDownloader.Tests.dll
 ```
