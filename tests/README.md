@@ -11,6 +11,12 @@ Obejmują walidację adresów, granice argumentów procesów, instalację i aktu
 komponentów, integralność pobrań, obsługę dużych strumieni stdout/stderr,
 zatrzymywanie procesów potomnych i anulowanie kolejki.
 
+Testy używają xunit v3 (`xunit.v3.mtp-off`, uruchamiane przez VSTest). Projekt
+testów jest programem: uruchomiony bez przełączników procesu potomnego
+(`--process-probe`, `--media-arguments` itd., patrz `Program.cs`) wykonuje
+wszystkie testy, np.
+`tests/YouTubeDownloader.Tests/bin/Release/net10.0/YouTubeDownloader.Tests`.
+
 Testy multimedialne wymagają dodatkowo Pythona 3.10+, yt-dlp, FFmpeg z kodekami
 libx264/libvpx-vp9/libopus oraz ffprobe. Narzędzia muszą być dostępne w PATH;
 zmienna `YT_DLP` może wskazywać plik wykonywalny yt-dlp. CI używa yt-dlp 2026.10.26.

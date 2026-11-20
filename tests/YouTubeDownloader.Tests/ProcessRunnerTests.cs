@@ -44,10 +44,10 @@ public class ProcessRunnerTests
         int[]? pids = null;
         try
         {
-            pids = await started.Task.WaitAsync(TimeSpan.FromSeconds(20));
+            pids = await started.Task.WaitAsync(TimeSpan.FromSeconds(20), TestContext.Current.CancellationToken);
             Assert.All(pids, pid => Assert.True(IsRunning(pid)));
             cancellation.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running.WaitAsync(TimeSpan.FromSeconds(10)));
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken));
             Assert.All(pids, pid => Assert.False(IsRunning(pid)));
         }
         finally

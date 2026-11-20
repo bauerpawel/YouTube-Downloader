@@ -18,7 +18,7 @@ public class AtomicDownloadTests
     {
         using var directory = new TestDirectory();
         string destination = directory.PathFor("yt-dlp");
-        await File.WriteAllTextAsync(destination, "working old version");
+        await File.WriteAllTextAsync(destination, "working old version", TestContext.Current.CancellationToken);
         byte[] bytes = Encoding.UTF8.GetBytes("new executable");
         using var http = new HttpClient(new StubHttpHandler(() =>
         {
@@ -35,9 +35,9 @@ public class AtomicDownloadTests
         await Assert.ThrowsAnyAsync<Exception>(() => AtomicDownload.DownloadAsync(http,
             "https://example.invalid/asset", destination,
             expectedSize: failure == "metadata-size" ? bytes.Length + 1 : null,
-            sha256: failure == "digest" ? new string('0', 64) : null));
+            sha256: failure == "digest" ? new string('0', 64) : null, cancellationToken: TestContext.Current.CancellationToken));
 
-        Assert.Equal("working old version", await File.ReadAllTextAsync(destination));
+        Assert.Equal("working old version", await File.ReadAllTextAsync(destination, TestContext.Current.CancellationToken));
         Assert.Equal(new[] { destination }, Directory.GetFileSystemEntries(directory.Root));
     }
 
@@ -46,15 +46,15 @@ public class AtomicDownloadTests
     {
         using var directory = new TestDirectory();
         string destination = directory.PathFor("yt-dlp");
-        await File.WriteAllTextAsync(destination, "old version");
+        await File.WriteAllTextAsync(destination, "old version", TestContext.Current.CancellationToken);
         byte[] bytes = Encoding.UTF8.GetBytes("new executable");
         using var http = new HttpClient(new StubHttpHandler(() => StubHttpHandler.Bytes(bytes)));
 
         await AtomicDownload.DownloadAsync(http, "https://example.invalid/asset", destination,
             progress => Assert.Equal("old version", File.ReadAllText(destination)),
-            bytes.Length, Convert.ToHexString(SHA256.HashData(bytes)));
+            bytes.Length, Convert.ToHexString(SHA256.HashData(bytes)), cancellationToken: TestContext.Current.CancellationToken);
 
-        Assert.Equal(bytes, await File.ReadAllBytesAsync(destination));
+        Assert.Equal(bytes, await File.ReadAllBytesAsync(destination, TestContext.Current.CancellationToken));
         Assert.Equal(new[] { destination }, Directory.GetFileSystemEntries(directory.Root));
     }
 

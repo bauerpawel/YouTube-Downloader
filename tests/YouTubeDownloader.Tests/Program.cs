@@ -3,7 +3,11 @@ using System.Diagnostics;
 
 namespace YouTubeDownloader.Tests;
 
-// A harmless child process for verifying argument boundaries on each OS.
+// The test assembly's entry point. xunit v3 test projects are executables, and
+// VSTest (xunit.runner.visualstudio) starts this assembly to discover and run the
+// tests, so any arguments not claimed below go to the xunit console runner.
+// The switches below make the same assembly a harmless child process for the
+// process tests, the argument-boundary tests and tests/media_smoke.py.
 internal static class Program
 {
     public static int Main(string[] args)
@@ -64,8 +68,12 @@ internal static class Program
                 Thread.Sleep(Timeout.Infinite);
             return args[2] == "fail" ? 1 : 0;
         }
-        Console.WriteLine(JsonSerializer.Serialize(args));
-        return 0;
+        if (args.Length >= 1 && args[0] == "--echo-arguments")
+        {
+            Console.WriteLine(JsonSerializer.Serialize(args[1..]));
+            return 0;
+        }
+        return Xunit.Runner.InProc.SystemConsole.ConsoleRunner.Run(args).GetAwaiter().GetResult();
     }
 }
 
