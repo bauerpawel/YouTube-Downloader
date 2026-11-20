@@ -172,7 +172,8 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - Calls `MakeExecutable(ytDlpPath)` after download, since a raw HTTP download has no executable bit on Linux/macOS
 
 **IsMatchingFFmpegAsset() / DownloadFFmpeg() / GetLatestFFmpegInfo()** - Windows and Linux only; macOS uses a separate download path (see the next bullet)
-- Uses the GitHub API to find the latest FFmpeg autobuild (BtbN/FFmpeg-Builds) and picks the release asset matching `IsMatchingFFmpegAsset()`:
+- Uses the GitHub API to find the latest FFmpeg autobuild (FFmpeg-Builds/FFmpeg-Builds, maintained by BtbN) and picks the release asset matching `IsMatchingFFmpegAsset()`:
+  - The repository was `BtbN/FFmpeg-Builds` until it moved to the `FFmpeg-Builds` organization (2026-11-07, same repository id 292087234). The API answers the old name with `301`, and `HttpClient` drops the `Authorization` header when it follows a redirect, so the lookup silently became anonymous: CI smoke tests then hit the 60/hour per-IP limit despite `YTD_GITHUB_TOKEN` (`403 (rate limit exceeded)` on FFmpeg only, builds 43 and 45). Keep every API URL on the repository's current owner/name - check with `curl -sI https://api.github.com/repos/<owner>/<repo>` for a `301`
   - Windows: name contains `win64-gpl-shared` and ends with `.zip`
   - Linux x64: ends with `linux64-gpl.tar.xz`; Linux ARM64: ends with `linuxarm64-gpl.tar.xz`
 - **The Linux variant is deliberately the static `gpl` build, not `gpl-shared`.** BtbN's Windows `-shared` build puts `ffmpeg.exe`/`ffprobe.exe` and their `*.dll`s together in one `bin/` folder, which Windows' DLL search order resolves automatically. BtbN's Linux `-shared` build instead splits the executables (`bin/`) from their `*.so` libraries (`lib/`), which requires setting `LD_LIBRARY_PATH` (or embedding an rpath) for the executables to find their shared libraries at runtime. The static `gpl` build sidesteps that entirely: `ffmpeg`/`ffprobe` are single self-contained binaries with everything linked in, so the same "find `bin/`, copy every file in it into `ffmpeg_bin/`" logic that already works for Windows works unmodified for Linux, with no `lib/`-copying or environment-variable step needed
@@ -181,7 +182,7 @@ All three dependency downloaders are OS-conditional (checked via `OperatingSyste
 - Stores version information in `ffmpeg_version.txt` for update checks
 
 **GetFFmpegMacAssetName() / GetLatestFFmpegInfoMac() / DownloadFFmpeg() on macOS**
-- macOS FFmpeg comes from a different upstream entirely: `eugeneware/ffmpeg-static` (BtbN/FFmpeg-Builds does not publish macOS binaries)
+- macOS FFmpeg comes from a different upstream entirely: `eugeneware/ffmpeg-static` (FFmpeg-Builds/FFmpeg-Builds does not publish macOS binaries)
 - `GetFFmpegMacAssetName()` matches assets by **exact name equality**, not substring/suffix matching: `ffmpeg-darwin-x64`/`ffmpeg-darwin-arm64` and `ffprobe-darwin-x64`/`ffprobe-darwin-arm64`. Exact equality is required specifically because the real `eugeneware/ffmpeg-static` release also publishes `.gz`/`.LICENSE`/`.README` sidecar assets whose names contain the target asset name as a substring - a substring/suffix check would false-match those
 - The two matched assets are raw executable binaries, not an archive. Both are downloaded into a staging folder, marked executable and verified before the complete `ffmpeg_bin/` folder is replaced
 - `DownloadFFmpeg()` and `CheckAndUpdateFFmpeg()` both branch to this path via `OperatingSystem.IsMacOS()` before reaching any BtbN-specific code
@@ -456,7 +457,7 @@ This environment has no full GUI test automation - there is no headless/CI-runna
 
 ### Dependency Versions
 - **yt-dlp**: Always latest from GitHub releases (Windows: `yt-dlp.exe`; Linux: `yt-dlp_linux`/`yt-dlp_linux_aarch64`; macOS: `yt-dlp_macos`, a single `universal2` binary for both architectures)
-- **FFmpeg**: Windows/Linux - latest autobuild from BtbN/FFmpeg-Builds (Windows: `win64-gpl-shared`; Linux: static `gpl` build - `linux64-gpl.tar.xz`/`linuxarm64-gpl.tar.xz`, see Dependency Management above for why static rather than shared). macOS - latest release from `eugeneware/ffmpeg-static` (BtbN does not publish macOS builds): loose binaries `ffmpeg-darwin-x64`/`ffmpeg-darwin-arm64` and `ffprobe-darwin-x64`/`ffprobe-darwin-arm64`, downloaded directly with no archive/extraction step
+- **FFmpeg**: Windows/Linux - latest autobuild from FFmpeg-Builds/FFmpeg-Builds (Windows: `win64-gpl-shared`; Linux: static `gpl` build - `linux64-gpl.tar.xz`/`linuxarm64-gpl.tar.xz`, see Dependency Management above for why static rather than shared). macOS - latest release from `eugeneware/ffmpeg-static` (BtbN does not publish macOS builds): loose binaries `ffmpeg-darwin-x64`/`ffmpeg-darwin-arm64` and `ffprobe-darwin-x64`/`ffprobe-darwin-arm64`, downloaded directly with no archive/extraction step
 - **Deno**: Latest release from denoland/deno (Windows: `x86_64-pc-windows-msvc`; Linux: `x86_64-unknown-linux-gnu`/`aarch64-unknown-linux-gnu`; macOS: `x86_64-apple-darwin`/`aarch64-apple-darwin`)
 - **Runtime Detection**: Checks for a system Deno/Node install in PATH using `where deno` (Windows) or `which deno` (Linux/macOS)
 
@@ -634,7 +635,7 @@ Before committing changes, verify:
   - License: Unlicense
 
 - **FFmpeg**: Audio/video processing
-  - Source (Windows/Linux): https://github.com/BtbN/FFmpeg-Builds
+  - Source (Windows/Linux): https://github.com/FFmpeg-Builds/FFmpeg-Builds
     - License: GPL (Windows: `gpl-shared` build; Linux: static `gpl` build - see Dependency Management above)
   - Source (macOS): https://github.com/eugeneware/ffmpeg-static
     - License: GPL (BtbN does not publish macOS builds; this is a separately-maintained project also used as the `ffmpeg-static` npm package)

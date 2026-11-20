@@ -263,7 +263,7 @@ YouTube-Downloader/
 ### 🔧 Zależności runtime (pobierane automatycznie)
 
 - **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** - Narzędzie do pobierania z YouTube
-- **[FFmpeg](https://ffmpeg.org/)** - Przetwarzanie audio/wideo (Windows/Linux: [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds); macOS: [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), ponieważ BtbN/FFmpeg-Builds nie publikuje wersji dla macOS)
+- **[FFmpeg](https://ffmpeg.org/)** - Przetwarzanie audio/wideo (Windows/Linux: [FFmpeg-Builds/FFmpeg-Builds](https://github.com/FFmpeg-Builds/FFmpeg-Builds); macOS: [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), ponieważ FFmpeg-Builds/FFmpeg-Builds nie publikuje wersji dla macOS)
 - **[Deno](https://deno.com/)** - Runtime JavaScript/TypeScript dla yt-dlp (opcjonalnie [Node.js](https://nodejs.org/))
 
 Narzędzia są zapisywane w katalogu danych użytkownika: `%LOCALAPPDATA%\YouTubeDownloader` (Windows), `~/.local/share/YouTubeDownloader` (Linux), `~/Library/Application Support/YouTubeDownloader` (macOS).
@@ -523,7 +523,7 @@ YouTube-Downloader/
 ### 🔧 Runtime dependencies (downloaded automatically)
 
 - **[yt-dlp](https://github.com/yt-dlp/yt-dlp)** - YouTube downloading tool
-- **[FFmpeg](https://ffmpeg.org/)** - Audio/video processing (Windows/Linux: [BtbN/FFmpeg-Builds](https://github.com/BtbN/FFmpeg-Builds); macOS: [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), since BtbN/FFmpeg-Builds doesn't publish macOS builds)
+- **[FFmpeg](https://ffmpeg.org/)** - Audio/video processing (Windows/Linux: [FFmpeg-Builds/FFmpeg-Builds](https://github.com/FFmpeg-Builds/FFmpeg-Builds); macOS: [eugeneware/ffmpeg-static](https://github.com/eugeneware/ffmpeg-static), since FFmpeg-Builds/FFmpeg-Builds doesn't publish macOS builds)
 - **[Deno](https://deno.com/)** - JavaScript/TypeScript runtime for yt-dlp (alternatively [Node.js](https://nodejs.org/))
 
 The tools are stored in the per-user data folder: `%LOCALAPPDATA%\YouTubeDownloader` (Windows), `~/.local/share/YouTubeDownloader` (Linux), `~/Library/Application Support/YouTubeDownloader` (macOS).
