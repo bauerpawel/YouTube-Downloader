@@ -84,14 +84,14 @@ jobs:
     - uses: actions/setup-dotnet@v6
       with:
         dotnet-version: 10.0.x
-    - uses: actions/setup-python@v6
+    - uses: actions/setup-python@v7
       with:
         python-version: '3.12'
     - name: Install media test tools
       run: |
         sudo apt-get update
         sudo apt-get install -y ffmpeg
-        python -m pip install yt-dlp==2026.08.19
+        python -m pip install yt-dlp==2026.10.26
     - name: Build format argument helper
       run: dotnet build tests/YouTubeDownloader.Tests/YouTubeDownloader.Tests.csproj -c Release
     - name: Test format selection and conversion with local media
